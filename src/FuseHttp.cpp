@@ -69,12 +69,29 @@ void FuseHttp::destroy(void *data)
 int FuseHttp::getattr(const char *name, struct stat *st)
 {
 	int r = 0;
+
+	std::cerr << __PRETTY_FUNCTION__ << ", name: " << name << std::endl;
+
+	if (strstr(name, ".mp3") || strstr(name, "mp4") || strstr(name, ".avi"))
+	{
+		st->st_mode = S_IFREG | S_IRUSR | S_IRGRP | S_IROTH;
+		r = 0;
+	}
+	else
+	{
+		st->st_mode = S_IFDIR | S_IXUSR | S_IXGRP | S_IXOTH;
+		r = 0;
+	}
+
 	return r;
 }
 
 int FuseHttp::open(const char *name, struct fuse_file_info *fi)
 {
 	int r = 0;
+
+	std::cerr << __PRETTY_FUNCTION__ << ", name: " << name << std::endl;
+
 	return r;
 }
 

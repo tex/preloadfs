@@ -33,7 +33,7 @@ void print_help(const char *name)
 
 int main(int argc, char **argv)
 {
-	g_DebugMode = false;
+	g_DebugMode = true;
 
 	if (argc != 2)
 		print_help(argv[0]);
@@ -49,6 +49,8 @@ int main(int argc, char **argv)
 	// 	kernel_cache - causes sigfaults when trying to run compiled
 	// 	               executables from FuseCompressed filesystem
 	//
+	if (g_DebugMode)
+		fuseOptions.push_back("-f");
 	fuseOptions.push_back("-o");
 	fuseOptions.push_back("default_permissions,use_ino,kernel_cache");
 	fuseOptions.push_back(dirMount);
