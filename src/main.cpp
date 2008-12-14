@@ -5,6 +5,7 @@
 #include <sys/stat.h>
 #include <dirent.h>
 #include <fcntl.h>
+#include <unistd.h>
 
 #include "FuseHttp.hpp"
 
@@ -26,7 +27,7 @@ void print_license()
 
 void print_help(const char *name)
 {
-	printf("%s mount_point\n", name)
+	printf("%s mount_point\n", name);
 	exit(1);
 }
 
@@ -37,9 +38,9 @@ int main(int argc, char **argv)
 	if (argc != 2)
 		print_help(argv[0]);
 
-	string dirMount(argv[1]);
+	std::string dirMount(argv[1]);
 
-	vector<string> fuseOptions;
+	std::vector<std::string> fuseOptions;
 	fuseOptions.push_back(argv[0]);
 
 	// Set up default options for fuse.
@@ -52,7 +53,7 @@ int main(int argc, char **argv)
 	fuseOptions.push_back("default_permissions,use_ino,kernel_cache");
 	fuseOptions.push_back(dirMount);
 
-	vector<const char *> fuse_c_str;
+	std::vector<const char *> fuse_c_str;
 	for (unsigned int i = 0; i < fuseOptions.size(); ++i)
 	{
 		fuse_c_str.push_back((fuseOptions[i].c_str()));

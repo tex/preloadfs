@@ -44,8 +44,8 @@ class FuseHttp
 	struct fuse_operations m_ops;
 
 public:
-	FuseCompress();
-	~FuseCompress();
+	FuseHttp();
+	~FuseHttp();
 	
 	int Run(int argc, const char **argv);
 };
