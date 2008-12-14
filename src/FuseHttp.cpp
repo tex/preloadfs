@@ -68,22 +68,18 @@ void FuseHttp::destroy(void *data)
 
 int FuseHttp::getattr(const char *name, struct stat *st)
 {
-	int r = 0;
-
 	std::cerr << __PRETTY_FUNCTION__ << ", name: " << name << std::endl;
 
 	if (strstr(name, ".mp3") || strstr(name, "mp4") || strstr(name, ".avi"))
 	{
 		st->st_mode = S_IFREG | S_IRUSR | S_IRGRP | S_IROTH;
-		r = 0;
 	}
 	else
 	{
 		st->st_mode = S_IFDIR | S_IXUSR | S_IXGRP | S_IXOTH;
-		r = 0;
 	}
 
-	return r;
+	return 0;
 }
 
 int FuseHttp::open(const char *name, struct fuse_file_info *fi)
@@ -104,19 +100,15 @@ int FuseHttp::read(const char *name, char *buf, size_t size, off_t offset, struc
 	return r;
 }
 
-int FuseHttp::write(const char *name, const char *buf, size_t size, off_t offset, struct fuse_file_info *fi)
-{
-	int r = 0;
-
-	sched_yield();
-
-	return r;
-}
-
 int FuseHttp::release(const char *name, struct fuse_file_info *fi)
 {
 	int r = 0;
 	return r;
+}
+
+int FuseHttp::write(const char *name, const char *buf, size_t size, off_t offset, struct fuse_file_info *fi)
+{
+	return 0;
 }
 
 int FuseHttp::readlink(const char *name, char *buf, size_t size)
