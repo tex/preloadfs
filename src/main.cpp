@@ -1,7 +1,6 @@
 #include "config.h"
 
 #include "PreLoadFs.hpp"
-typedef PreLoadFs MAINFS;
 
 #include <errno.h>
 #include <sys/types.h>

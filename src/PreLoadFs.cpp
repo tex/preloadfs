@@ -9,6 +9,8 @@
 #include <iostream>
 #include <boost/scoped_array.hpp>
 
+extern bool g_DebugMode;
+
 PreLoadFs::PreLoadFs(std::string tmpPath, size_t tmpSize, std::string fileToMount) :
 	m_name(fileToMount),
 	m_refs(0),
@@ -56,18 +58,21 @@ int PreLoadFs::getattr(const char *name, struct stat *st)
 {
 	int r = 0;
 
-	std::cout << __PRETTY_FUNCTION__ << name << std::endl;
+	if (g_DebugMode)
+		std::cout << __PRETTY_FUNCTION__ << name << std::endl;
 
 	memset(st, 0, sizeof(struct stat));
 
-	assert(name[0] != '\0');
-	if (name[1] == '\0')
+	if (name[0] == '/')
+		++name;
+
+	if (name[0] == '\0')
 		st->st_mode = S_IFDIR | 0755;
 	else
 	{
-		++name;
 		boost::filesystem::path tmp(m_name.leaf());
-		std::cout << __PRETTY_FUNCTION__ << tmp << std::endl;
+		if (g_DebugMode)
+			std::cout << __PRETTY_FUNCTION__ << tmp << std::endl;
 
 		if (strcmp(name, tmp.string().c_str()) == 0)
 			r = ::stat(m_name.string().c_str(), st);
@@ -75,12 +80,18 @@ int PreLoadFs::getattr(const char *name, struct stat *st)
 			r = -ENOENT;
 	}
 
+	if (g_DebugMode)
+		std::cout << __PRETTY_FUNCTION__ << r << std::endl;
+
 	return r;
 }
 
 int PreLoadFs::readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t offset, struct fuse_file_info *fi)
 {
 	struct stat st;
+
+	if (g_DebugMode)
+		std::cout << __PRETTY_FUNCTION__ << path << std::endl;
 
 	memset(&st, 0, sizeof(st));
 	st.st_ino = 0;
@@ -103,14 +114,22 @@ int PreLoadFs::readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_
 
 int PreLoadFs::open(const char *name, struct fuse_file_info * /*fi*/)
 {
-	/** Use only one file descriptor for all user's open requests.
-	**/
-	boost::filesystem::path tmp(m_name.leaf());
-	assert(strcmp(name[1], tmp.string().c_str) == 0);
+	if (g_DebugMode)
+		std::cout << __PRETTY_FUNCTION__ << std::endl;
 
-	if (m_fd != -1)
-		++m_refs;
-	return m_fd;
+	boost::filesystem::path tmp(m_name.leaf());
+	if (strcmp(&name[1], tmp.string().c_str()) != 0)
+		return -ENOENT;
+
+	if (m_fd == -1)
+		return -ENOENT;
+
+	++m_refs;
+
+	if (g_DebugMode)
+		std::cout << __PRETTY_FUNCTION__ << ": m_fd: " << m_fd << std::endl;
+
+	return 0;
 }
 
 int PreLoadFs::release(const char *name, struct fuse_file_info * /*fi*/)
@@ -129,11 +148,17 @@ int PreLoadFs::read(const char *name, char *buf, size_t len, off_t offset, struc
 {
 	char *orig_buf = buf;
 
+	if (g_DebugMode)
+		std::cout << __PRETTY_FUNCTION__<< "offset: " << offset << ", len: " << len << std::endl;
+
 	/** Perform seek if user wants to read from offset
 	 *  different than we have currently.
 	**/
 	if (m_offset != offset)
 	{
+		if (g_DebugMode)
+			std::cout << __PRETTY_FUNCTION__ << "seeking..." << std::endl;
+
 		pthread_mutex_lock(&m_mutex);
 
 		/** Clear the circular buffer.
@@ -168,12 +193,18 @@ int PreLoadFs::read(const char *name, char *buf, size_t len, off_t offset, struc
 		**/
 		m_exception = false;
 
+		if (g_DebugMode)
+			std::cout << __PRETTY_FUNCTION__ << "signaling to m_wakeupReadNewData..." << std::endl;
+
 		/** Let know the thread that it can read new data.
 		**/
 		pthread_cond_signal(&m_wakeupReadNewData);
 
 		pthread_mutex_unlock(&m_mutex);
 	}
+
+	if (g_DebugMode)
+		std::cout << __PRETTY_FUNCTION__ << "reading..." << std::endl;
 
 	while (len > 0)
 	{
@@ -265,12 +296,23 @@ begin:		int freeBytes = 0;
 		**/
 		freeBytes = m_buffer.free();
 
+		if (m_seeked == true)
+			m_seeked = false;
+
 		pthread_mutex_unlock(&m_mutex);
+
+		if (g_DebugMode)
+			std::cout << __PRETTY_FUNCTION__ << "..reading" << std::endl;
 
 		/** This read() may take a long time, thus we don't hold
 		 *  the mutex.
+		 *  TODO: This should be rewritten to use select to be able to
+		 *  cancel donwload imediataly (on seek).
 		**/
 		int r = ::read(m_fd, buf, std::min(buf_size, freeBytes));
+
+		if (g_DebugMode)
+			std::cout << __PRETTY_FUNCTION__ << "..read: " << r << std::endl;
 
 		pthread_mutex_lock(&m_mutex);
 
@@ -326,6 +368,9 @@ begin:		int freeBytes = 0;
 					**/
 					pthread_cond_wait(&m_wakeupReadNewData, &m_mutex);
 				}
+
+				if (g_DebugMode)
+					std::cout << __PRETTY_FUNCTION__ << "..pushing" << std::endl;
 
 				/** Store data to the buffer.
 				**/
