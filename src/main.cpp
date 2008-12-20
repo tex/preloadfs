@@ -9,6 +9,7 @@ typedef PreLoadFs MAINFS;
 #include <dirent.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <stdlib.h>
 
 #include <cstdlib>
 #include <cstring>
@@ -16,8 +17,8 @@ typedef PreLoadFs MAINFS;
 #include <vector>
 #include <string>
 
-bool      g_DebugMode;
-PreLoadFs g_PreLoadFs("/tmp", 1*1024*1024*1024);
+bool       g_DebugMode;
+PreLoadFs* g_PreLoadFs;
 
 void print_license()
 {
@@ -30,36 +31,43 @@ void print_license()
 void print_help(const char *name)
 {
 	printf("%s fileToMount mountPoint\n", name);
-	exit(1);
+	exit(EXIT_FAILURE);
 }
 
 int Getattr (const char *name, struct stat *stat)
 {
-	return g_PreLoadFs.getattr(name, stat);
+	return g_PreLoadFs->getattr(name, stat);
 }
 
 int Readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t offset, struct fuse_file_info *fi)
 {
-	return g_PreLoadFs.readdir(path, buf, filler, offset, fi);
+	return g_PreLoadFs->readdir(path, buf, filler, offset, fi);
 }
 
 int Open(const char *name, struct fuse_file_info *fi)
 {
-	return g_PreLoadFs.open(name, fi);
+	return g_PreLoadFs->open(name, fi);
 }
 
 int Release(const char *name, struct fuse_file_info *fi)
 {
-	return g_PreLoadFs.release(name, fi);
+	return g_PreLoadFs->release(name, fi);
 }
 
 int Read(const char *name, char *buf, size_t len, off_t offset, struct fuse_file_info *fi)
 {
-	return g_PreLoadFs.read(name, buf, len, offset, fi);
+	return g_PreLoadFs->read(name, buf, len, offset, fi);
 }
 
 int run(std::vector<const char *>& fuse_c_str, std::string& fileToMount)
 {
+	g_PreLoadFs = new PreLoadFs("/tmp", 1 * 1024 * 1024, fileToMount);
+	if (g_PreLoadFs == NULL)
+	{
+		std::cerr << "Failed to create an instance of PreLoadFs" << std::endl;
+		return EXIT_FAILURE;
+	}
+
 	struct fuse_operations ops;
 	memset(&ops, 0, sizeof ops);
 

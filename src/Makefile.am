@@ -1,4 +1,4 @@
-bin_PROGRAMS = fusehttp
+bin_PROGRAMS = preloadfs
 
 common = \
 	PreLoadFs.cpp \
@@ -10,7 +10,7 @@ noinst_HEADERS = \
 	CBuffer.hpp \
 	FBuffer.hpp
 
-fusehttp_SOURCES = $(common) main.cpp
+preloadfs_SOURCES = $(common) main.cpp
 
 AM_CXXFLAGS = $(BOOST_CXXFLAGS)
 

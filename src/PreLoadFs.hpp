@@ -4,6 +4,7 @@
 #include "FBuffer.hpp"
 #include <fuse.h>
 #include <pthread.h>
+#include <boost/filesystem.hpp>
 
 class PreLoadFs
 {
@@ -11,10 +12,8 @@ public:
 	/** Constructor.
 	 *  @param tmpPath temporary file storage path
 	 **/
-	PreLoadFs(std::string tmpPath, size_t tmpSize);
+	PreLoadFs(std::string tmpPath, size_t tmpSize, std::string fileToMount);
 	~PreLoadFs();
-
-	inline static const char *getpath(const char *path);
 
 	int getattr (const char *, struct stat *);
 	int readdir (const char *, void *, fuse_fill_dir_t, off_t, struct fuse_file_info *);
@@ -36,7 +35,7 @@ private:
 
 	/** Name of pre-loaded file.
 	**/
-	std::string     m_name;
+	boost::filesystem::path m_name;
 
 	/** File desciptor of opened pre-loaded file.
 	**/

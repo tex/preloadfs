@@ -6,9 +6,11 @@
 #include <assert.h>
 #include <dirent.h>
 #include <string.h>
+#include <iostream>
 #include <boost/scoped_array.hpp>
 
-PreLoadFs::PreLoadFs(std::string tmpPath, size_t tmpSize) :
+PreLoadFs::PreLoadFs(std::string tmpPath, size_t tmpSize, std::string fileToMount) :
+	m_name(fileToMount),
 	m_fd(-1),
 	m_refs(0),
 	m_offset(0),
@@ -24,43 +26,52 @@ PreLoadFs::~PreLoadFs()
 	assert(m_fd == -1);
 }
 
-int PreLoadFs::getattr (const char *, struct stat *)
+int PreLoadFs::getattr(const char *name, struct stat *st)
 {
-	return 0;
-}
+	int r = 0;
 
-const char *PreLoadFs::getpath(const char *path)
-{
-	assert(path[0] != '\0');
+	std::cout << __PRETTY_FUNCTION__ << name << std::endl;
 
-	if ((path[0] == '/') && (path[1] == '\0'))
-		return ".";
-	return ++path;
+	memset(st, 0, sizeof(struct stat));
+
+	assert(name[0] != '\0');
+	if (name[1] == '\0')
+		st->st_mode = S_IFDIR | 0755;
+	else
+	{
+		++name;
+		boost::filesystem::path tmp(m_name.leaf());
+		std::cout << __PRETTY_FUNCTION__ << tmp << std::endl;
+
+		if (strcmp(name, tmp.string().c_str()) == 0)
+			r = ::stat(m_name.string().c_str(), st);
+		else
+			r = -ENOENT;
+	}
+
+	return r;
 }
 
 int PreLoadFs::readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t offset, struct fuse_file_info *fi)
 {
-	DIR           *dp;
-	struct dirent *de;
+	struct stat st;
 
-	path = getpath(path);
+	memset(&st, 0, sizeof(st));
+	st.st_ino = 0;
+	st.st_mode = S_IFDIR;
+	filler(buf, ".", &st, 0);
 
-	dp = ::opendir(path);
-	if (dp == NULL)
-		return -errno;
+	memset(&st, 0, sizeof(st));
+	st.st_ino = 1;
+	st.st_mode = S_IFDIR;
+	filler(buf, "..", &st, 0);
 
-	while ((de = ::readdir(dp)) != NULL)
-	{
-		struct stat st;
+	memset(&st, 0, sizeof(st));
+	st.st_ino = 2;
+	st.st_mode = S_IFREG;
+	boost::filesystem::path tmp(m_name.leaf());
+	filler(buf, tmp.string().c_str(), &st, 0);
 
-		memset(&st, 0, sizeof(st));
-		st.st_ino = de->d_ino;
-		st.st_mode = de->d_type << 12;
-		if (filler(buf, de->d_name, &st, 0))
-			break;
-	}
-
-	::closedir(dp);
 	return 0;
 }
 
@@ -70,8 +81,6 @@ int PreLoadFs::open(const char *name, struct fuse_file_info * /*fi*/)
 	**/
 	if (m_fd != -1)
 	{
-		assert(m_name == name);
-
 		++m_refs;
 		return m_fd;
 	}
@@ -83,8 +92,6 @@ int PreLoadFs::open(const char *name, struct fuse_file_info * /*fi*/)
 
 	if (m_fd != -1)
 	{
-		m_name = name;
-
 		/** Create only one thread
 		**/
 		int r = pthread_create(&m_thread, NULL, &PreLoadFs::runT, this);
@@ -125,8 +132,6 @@ int PreLoadFs::release(const char *name, struct fuse_file_info * /*fi*/)
 		**/
 		m_exception = false;
 		m_seeked = false;
-
-		m_name.clear();
 	}
 	return 0;
 }
