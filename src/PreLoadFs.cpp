@@ -11,17 +11,43 @@
 
 PreLoadFs::PreLoadFs(std::string tmpPath, size_t tmpSize, std::string fileToMount) :
 	m_name(fileToMount),
-	m_fd(-1),
 	m_refs(0),
 	m_offset(0),
 	m_buffer(tmpPath, tmpSize),
 	m_exception(false),
 	m_seeked(false)
 {
+	/** We are read only buffering 'filesystem'. So we open
+	 *  a file as read only.
+	**/
+	m_fd = ::open(m_name.string().c_str(), O_RDONLY);
+
+	if (m_fd != -1)
+	{
+		/** Create only one thread
+		**/
+		int r = pthread_create(&m_thread, NULL, &PreLoadFs::runT, this);
+		if (r != 0)
+		{
+			/** Failed to create thread. Clean up
+			 *  used resources.
+			**/
+			::close(m_fd);
+			m_fd = -1;
+		}
+	}
 }
 
 PreLoadFs::~PreLoadFs()
 {
+	/** Cancel thread and wait to its termination.
+	**/
+	pthread_cancel(m_thread);
+	pthread_join(m_thread, NULL);
+
+	close(m_fd);
+	m_fd = -1;
+
 	assert(m_refs == 0);
 	assert(m_fd == -1);
 }
@@ -79,34 +105,11 @@ int PreLoadFs::open(const char *name, struct fuse_file_info * /*fi*/)
 {
 	/** Use only one file descriptor for all user's open requests.
 	**/
+	boost::filesystem::path tmp(m_name.leaf());
+	assert(strcmp(name[1], tmp.string().c_str) == 0);
+
 	if (m_fd != -1)
-	{
 		++m_refs;
-		return m_fd;
-	}
-
-	/** We are read only buffering 'filesystem'. So we open
-	 *  a file as read only.
-	**/
-	m_fd = ::open(name, O_RDONLY);
-
-	if (m_fd != -1)
-	{
-		/** Create only one thread
-		**/
-		int r = pthread_create(&m_thread, NULL, &PreLoadFs::runT, this);
-		if (r != 0)
-		{
-			/** Failed to create thread. Clean up
-			 *  used resources.
-			**/
-			::close(m_fd);
-			m_fd = -1;
-		}
-		else
-			m_refs = 1;
-	}
-
 	return m_fd;
 }
 
@@ -114,20 +117,6 @@ int PreLoadFs::release(const char *name, struct fuse_file_info * /*fi*/)
 {
 	if (--m_refs == 0)
 	{
-		/** Reference dropped to zero, no-one is using
-		 *  the file.
-		**/
-
-		/** Cancel thread and wait to its termination.
-		**/
-		pthread_cancel(m_thread);
-		pthread_join(m_thread, NULL);
-
-		/** Release used resources.
-		**/
-		::close(m_fd);
-		m_fd = -1;
-
 		/** Set flags to default state.
 		**/
 		m_exception = false;
