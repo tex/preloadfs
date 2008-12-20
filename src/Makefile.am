@@ -1,10 +1,14 @@
 bin_PROGRAMS = fusehttp
 
 common = \
-	FuseHttp.cpp
+	PreLoadFs.cpp \
+	CBuffer.cpp \
+	FBuffer.cpp
 
 noinst_HEADERS = \
-	FuseHttp.hpp
+	PreLoadFs.hpp \
+	CBuffer.hpp \
+	FBuffer.hpp
 
 fusehttp_SOURCES = $(common) main.cpp
 
