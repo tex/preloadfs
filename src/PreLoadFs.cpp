@@ -58,30 +58,35 @@ int PreLoadFs::getattr(const char *name, struct stat *st)
 {
 	int r = 0;
 
-	if (g_DebugMode)
-		std::cout << __PRETTY_FUNCTION__ << name << std::endl;
-
 	memset(st, 0, sizeof(struct stat));
+
+	if (g_DebugMode)
+		std::cout << __PRETTY_FUNCTION__ << ", name: " << name << std::endl;
 
 	if (name[0] == '/')
 		++name;
 
 	if (name[0] == '\0')
-		st->st_mode = S_IFDIR | 0755;
+	{
+		r = ::stat(".", st);
+	}
 	else
 	{
+		/** File name of the mounted file.
+		**/
 		boost::filesystem::path tmp(m_name.leaf());
-		if (g_DebugMode)
-			std::cout << __PRETTY_FUNCTION__ << tmp << std::endl;
 
-		if (strcmp(name, tmp.string().c_str()) == 0)
+		if (tmp.string().compare(name) == 0)
+		{
+			/** Get stats of mounted file
+			**/
 			r = ::stat(m_name.string().c_str(), st);
+		}
 		else
+			/** Only mounted file is visible in mount point.
+			**/
 			r = -ENOENT;
 	}
-
-	if (g_DebugMode)
-		std::cout << __PRETTY_FUNCTION__ << r << std::endl;
 
 	return r;
 }
@@ -94,17 +99,17 @@ int PreLoadFs::readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_
 		std::cout << __PRETTY_FUNCTION__ << path << std::endl;
 
 	memset(&st, 0, sizeof(st));
-	st.st_ino = 0;
+	st.st_ino = 1;
 	st.st_mode = S_IFDIR;
 	filler(buf, ".", &st, 0);
 
 	memset(&st, 0, sizeof(st));
-	st.st_ino = 1;
+	st.st_ino = 2;
 	st.st_mode = S_IFDIR;
 	filler(buf, "..", &st, 0);
 
 	memset(&st, 0, sizeof(st));
-	st.st_ino = 2;
+	st.st_ino = 3;
 	st.st_mode = S_IFREG;
 	boost::filesystem::path tmp(m_name.leaf());
 	filler(buf, tmp.string().c_str(), &st, 0);
@@ -112,17 +117,30 @@ int PreLoadFs::readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_
 	return 0;
 }
 
-int PreLoadFs::open(const char *name, struct fuse_file_info * /*fi*/)
+int PreLoadFs::open(const char *name, struct fuse_file_info *fi)
 {
 	if (g_DebugMode)
 		std::cout << __PRETTY_FUNCTION__ << std::endl;
 
+	/** File name of the mounted file.
+	**/
 	boost::filesystem::path tmp(m_name.leaf());
-	if (strcmp(&name[1], tmp.string().c_str()) != 0)
+
+	/** Allow to open only our mounted file.
+	**/
+	if (tmp.string().compare(&name[1]) != 0)
 		return -ENOENT;
 
+	/** Allow to open only if we sucessfuly opened
+	 *  the file.
+	 **/
 	if (m_fd == -1)
 		return -ENOENT;
+
+	/** Allow to open only in read only mode.
+	**/
+	if ((fi->flags & 3) != O_RDONLY)
+		return -EACCES;
 
 	++m_refs;
 
@@ -150,6 +168,14 @@ int PreLoadFs::read(const char *name, char *buf, size_t len, off_t offset, struc
 
 	if (g_DebugMode)
 		std::cout << __PRETTY_FUNCTION__<< "offset: " << offset << ", len: " << len << std::endl;
+
+	/** File name of the mounted file.
+	**/
+	boost::filesystem::path tmp(m_name.leaf());
+
+	/** Assert that user can read only from our mounted file.
+	**/
+	assert(tmp.string().compare(&name[1]) == 0);
 
 	/** Perform seek if user wants to read from offset
 	 *  different than we have currently.
@@ -279,6 +305,11 @@ void PreLoadFs::run()
 	/** Local buffer size at most 4096 bytes
 	**/
 	int buf_size = std::min(4096, m_buffer.size());
+
+	/** FIX: This is memory leak. We ignore it now because
+	 *       if this thread is canceled the whole application
+	 *       exit.
+	 **/
 	char* buf = new char[buf_size];
 
 	while (true)

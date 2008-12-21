@@ -92,12 +92,6 @@ int main(int argc, char **argv)
 	std::vector<std::string> fuseOptions;
 	fuseOptions.push_back(argv[0]);
 
-	// Set up default options for fuse.
-	// 
-	// Fuse problems:
-	// 	kernel_cache - causes sigfaults when trying to run compiled
-	// 	               executables from FuseCompressed filesystem
-	//
 	if (g_DebugMode)
 		fuseOptions.push_back("-f");
 	fuseOptions.push_back("-o");
@@ -110,7 +104,9 @@ int main(int argc, char **argv)
 		fuse_c_str.push_back((fuseOptions[i].c_str()));
 	}
 
+	chdir(mountPoint.c_str());
 	umask(0);
+
 	return run(fuse_c_str, fileToMount);
 }
 

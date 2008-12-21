@@ -33,7 +33,7 @@ private:
 	**/
 	void run();
 
-	/** Name of pre-loaded file.
+	/** Name of pre-loaded (mounted) file.
 	**/
 	boost::filesystem::path m_name;
 
