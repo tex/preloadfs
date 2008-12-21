@@ -271,6 +271,9 @@ int PreLoadFs::read(const char *name, char *buf, size_t len, off_t offset, struc
 		buf += r;
 		len -= r;
 
+		if (g_DebugMode)
+			std::cout << __PRETTY_FUNCTION__ << ", get returned: " << r << std::endl;
+
 		/** Let know the thread that it can read new data.
 		**/
 		pthread_cond_signal(&m_wakeupReadNewData);
@@ -349,7 +352,12 @@ begin:		int freeBytes = 0;
 
 		if (m_seeked == true)
 		{
+			if (g_DebugMode)
+				std::cout << __PRETTY_FUNCTION__ << "..seeked...continue" << std::endl;
+
 			m_seeked = false;
+
+			pthread_mutex_unlock(&m_mutex);
 
 			/** User seeked before we stored data in the buffer,
 			 *  by continue we discard them and start again.
@@ -386,7 +394,12 @@ begin:		int freeBytes = 0;
 
 					if (m_seeked == true)
 					{
+						if (g_DebugMode)
+							std::cout << __PRETTY_FUNCTION__ << "..seeked...goto begin" << std::endl;
+
 						m_seeked = false;
+
+						pthread_mutex_unlock(&m_mutex);
 
 						/** User seeked before we stored data in the buffer,
 						 *  by continue we discard them and start again.
