@@ -165,6 +165,8 @@ int PreLoadFs::release(const char *name, struct fuse_file_info * /*fi*/)
 
 int PreLoadFs::seek(off_t offset)
 {
+	assert(m_offset != offset);
+
 	if (g_DebugMode)
 		std::cout << __PRETTY_FUNCTION__ << "seeking..." << std::endl;
 
@@ -172,6 +174,17 @@ int PreLoadFs::seek(off_t offset)
 
 	if (g_DebugMode)
 		std::cout << __PRETTY_FUNCTION__ << "seeking...locked" << std::endl;
+
+	if ((m_offset < offset) && (m_offset + m_buffer.full() > offset))
+	{
+		/** There are data in the buffer covering required offset.
+		**/
+		assert(offset - m_offset > 0);
+		m_buffer.advance(offset - m_offset);
+
+		pthread_mutex_unlock(&m_mutex);
+		return 0;
+	}
 
 	/** Clear the circular buffer.
 	**/
@@ -215,7 +228,6 @@ int PreLoadFs::seek(off_t offset)
 	pthread_cond_signal(&m_wakeupReadNewData);
 
 	pthread_mutex_unlock(&m_mutex);
-
 	return 0;
 }
 

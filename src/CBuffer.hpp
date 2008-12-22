@@ -50,6 +50,8 @@ public:
 	 **/
 	int size() const { return m_bufferSize; }
 
+	void advance(int offset) { m_readP += offset; }
+
 private:
 	/** Really read data from backed storage (may be memory,
 	 *  file or ...). This method must be implemented by
