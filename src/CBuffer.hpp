@@ -43,6 +43,8 @@ public:
 
 	bool isFull() const { return m_full; }
 
+	bool isAlmostFull() const { return full() * 4 / 3 > size(); }
+
 	/** Return size of buffer in bytes.
 	 *  @return size of buffer in bytes
 	 **/

@@ -17,7 +17,8 @@ PreLoadFs::PreLoadFs(std::string tmpPath, size_t tmpSize, std::string fileToMoun
 	m_offset(0),
 	m_buffer(tmpPath, tmpSize),
 	m_exception(false),
-	m_seeked(false)
+	m_seeked(false),
+	m_wasAlmostFull(false)
 {
 	/** We are read only buffering 'filesystem'. So we open
 	 *  a file as read only.
@@ -162,6 +163,62 @@ int PreLoadFs::release(const char *name, struct fuse_file_info * /*fi*/)
 	return 0;
 }
 
+int PreLoadFs::seek(off_t offset)
+{
+	if (g_DebugMode)
+		std::cout << __PRETTY_FUNCTION__ << "seeking..." << std::endl;
+
+	pthread_mutex_lock(&m_mutex);
+
+	if (g_DebugMode)
+		std::cout << __PRETTY_FUNCTION__ << "seeking...locked" << std::endl;
+
+	/** Clear the circular buffer.
+	**/
+	m_buffer.clear();
+
+	/** Seek to required position in opened file.
+	**/
+	off_t r = ::lseek(m_fd, offset, SEEK_SET);
+	if (r == (off_t) -1)
+	{
+		/** lseek() failed, unlock mutex and return
+		 *  error return value.
+		**/
+		pthread_mutex_unlock(&m_mutex);
+		return -errno;
+	}
+
+	/** Set offset to new value.
+	**/
+	m_offset = r;
+
+	/** Set flag to let know the thread that we seeked to
+	 *  a new offset (It has to eventually discard data
+	 *  that has been read and not stored to circular buffer
+	 *  yet.
+	**/
+	m_seeked = true;
+
+	/** Clear exception flag. It might be set when end of
+	 *  file detected, so seek should clear this exception.
+	**/
+	m_exception = false;
+
+	m_wasAlmostFull = false;
+
+	if (g_DebugMode)
+		std::cout << __PRETTY_FUNCTION__ << "signaling to m_wakeupReadNewData..." << std::endl;
+
+	/** Let know the thread that it can read new data.
+	**/
+	pthread_cond_signal(&m_wakeupReadNewData);
+
+	pthread_mutex_unlock(&m_mutex);
+
+	return 0;
+}
+
 int PreLoadFs::read(const char *name, char *buf, size_t len, off_t offset, struct fuse_file_info * /*fi*/)
 {
 	char *orig_buf = buf;
@@ -182,51 +239,9 @@ int PreLoadFs::read(const char *name, char *buf, size_t len, off_t offset, struc
 	**/
 	if (m_offset != offset)
 	{
-		if (g_DebugMode)
-			std::cout << __PRETTY_FUNCTION__ << "seeking..." << std::endl;
-
-		pthread_mutex_lock(&m_mutex);
-
-		/** Clear the circular buffer.
-		**/
-		m_buffer.clear();
-
-		/** Seek to required position in opened file.
-		**/
-		off_t r = ::lseek(m_fd, offset, SEEK_SET);
-		if (r == (off_t) -1)
-		{
-			/** lseek() failed, unlock mutex and return
-			 *  error return value.
-			**/
-			pthread_mutex_unlock(&m_mutex);
-			return -1;
-		}
-
-		/** Set offset to new value.
-		**/
-		m_offset = r;
-
-		/** Set flag to let know the thread that we seeked to
-		 *  a new offset (It has to eventually discard data
-		 *  that has been read and not stored to circular buffer
-		 *  yet.
-		**/
-		m_seeked = true;
-
-		/** Clear exception flag. It might be set when end of
-		 *  file detected, so seek should clear this exception.
-		**/
-		m_exception = false;
-
-		if (g_DebugMode)
-			std::cout << __PRETTY_FUNCTION__ << "signaling to m_wakeupReadNewData..." << std::endl;
-
-		/** Let know the thread that it can read new data.
-		**/
-		pthread_cond_signal(&m_wakeupReadNewData);
-
-		pthread_mutex_unlock(&m_mutex);
+		int r = seek(offset);
+		if (r != 0)
+			return r;
 	}
 
 	if (g_DebugMode)
@@ -236,31 +251,18 @@ int PreLoadFs::read(const char *name, char *buf, size_t len, off_t offset, struc
 	{
 		pthread_mutex_lock(&m_mutex);
 
-		while (m_buffer.isFree())
+		if (g_DebugMode)
+			std::cout << __PRETTY_FUNCTION__ << ", isAlmostFull: " << m_buffer.isAlmostFull() << ", m_exception: " << m_exception << std::endl;
+
+		while ((!m_buffer.isAlmostFull() && (m_wasAlmostFull == false) && (m_exception == false)) || (m_seeked == true))
 		{
-			/** Buffer is empty. Check exception flag and
-			 *  return error code in case of error or number
-			 *  of bytes read so far in case of detected end
-			 *  of file.
-			**/
-			if (m_exception == true)
-			{
-				pthread_mutex_unlock(&m_mutex);
+			if (g_DebugMode)
+				std::cout << __PRETTY_FUNCTION__ << ", isAlmostFull: " << m_buffer.isAlmostFull() << ", m_exception: " << m_exception << std::endl;
 
-				if (m_error != 0)
-				{
-					/** Error. Set errno to let the user know
-					 *  type of error.
-					**/
-					errno = m_error;
-
-					return -1;
-				}
-				else
-					goto end;
-			}
-
-			/** Wait for a new data.
+			/** Wait for a new data if buffer is not almost full or exception
+			 *  is detected (when exception is detected there will be no more
+			 *  data so we have to read what's available because there will
+			 *  not be any new data.
 			**/
 			pthread_cond_wait(&m_wakeupNewData, &m_mutex);
 		}
@@ -274,13 +276,32 @@ int PreLoadFs::read(const char *name, char *buf, size_t len, off_t offset, struc
 		if (g_DebugMode)
 			std::cout << __PRETTY_FUNCTION__ << ", get returned: " << r << std::endl;
 
+		/** Detect exception only if there are no data in the buffer.
+		**/
+		if (r == 0)
+		{
+			m_wasAlmostFull = false;
+
+			if (m_exception == true)
+			{
+				if (m_error != 0)
+				{
+					pthread_mutex_unlock(&m_mutex);
+
+					assert(m_error > 0);
+					return -m_error;
+				}
+			}
+			pthread_mutex_unlock(&m_mutex);
+			break;
+		}
 		/** Let know the thread that it can read new data.
 		**/
 		pthread_cond_signal(&m_wakeupReadNewData);
 
 		pthread_mutex_unlock(&m_mutex);
 	}
-end:
+
 	/** Compute total bytes read.
 	**/
 	int t = buf - orig_buf;
@@ -323,8 +344,16 @@ begin:		int freeBytes = 0;
 
 		/** Wait until buffer is not full or exception is resolved.
 		**/
+		if (g_DebugMode)
+			std::cout << __PRETTY_FUNCTION__ << ", isFull: " << m_buffer.isFull() << ", exception: " << m_exception << std::endl;
+
 		while (m_buffer.isFull() || (m_exception == true))
+		{
+			if (g_DebugMode)
+				std::cout << __PRETTY_FUNCTION__ << ", isFull: " << m_buffer.isFull() << ", exception: " << m_exception << std::endl;
+
 			pthread_cond_wait(&m_wakeupReadNewData, &m_mutex);
+		}
 
 		/** Get number of bytes that may be stored in the buffer.
 		**/
@@ -344,7 +373,7 @@ begin:		int freeBytes = 0;
 		 *  cancel donwload imediataly (on seek).
 		**/
 		int r = ::read(m_fd, buf, std::min(buf_size, freeBytes));
-
+usleep(100*1000);
 		if (g_DebugMode)
 			std::cout << __PRETTY_FUNCTION__ << "..read: " << r << std::endl;
 
@@ -387,6 +416,9 @@ begin:		int freeBytes = 0;
 
 			while (r > 0)
 			{
+				if (g_DebugMode)
+					std::cout << __PRETTY_FUNCTION__ << ", isFull: " << m_buffer.isFull() << ", exception: " << m_exception << std::endl;
+
 				while (m_buffer.isFull())
 				{
 					/** Buffer is full, no space to store new data.
@@ -406,6 +438,10 @@ begin:		int freeBytes = 0;
 						**/
 						goto begin;
 					}
+
+					if (g_DebugMode)
+						std::cout << __PRETTY_FUNCTION__ << ", isFull: " << m_buffer.isFull() << ", exception: " << m_exception << std::endl;
+
 
 					/** Wait until there is a free space in the
 					 *  buffer.

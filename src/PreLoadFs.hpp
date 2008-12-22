@@ -33,6 +33,8 @@ private:
 	**/
 	void run();
 
+	int seek(off_t offset);
+
 	/** Name of pre-loaded (mounted) file.
 	**/
 	boost::filesystem::path m_name;
@@ -87,6 +89,8 @@ private:
 	 *  cleared only in run().
 	 **/
 	bool            m_seeked;
+
+	bool            m_wasAlmostFull;
 };
 
 #endif
