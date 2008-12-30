@@ -58,9 +58,9 @@ int Read(const char *name, char *buf, size_t len, off_t offset, struct fuse_file
 	return g_PreLoadFs->read(name, buf, len, offset, fi);
 }
 
-int run(std::vector<const char *>& fuse_c_str, std::string& fileToMount)
+int run(std::vector<const char *>& fuse_c_str, const char* fileToMount)
 {
-	g_PreLoadFs = new PreLoadFs("/tmp", 1 * 1024 * 1024, fileToMount);
+	g_PreLoadFs = new PreLoadFs("/tmp", 5 * 1024 * 1024, fileToMount);
 	if (g_PreLoadFs == NULL)
 	{
 		std::cerr << "Failed to create an instance of PreLoadFs" << std::endl;
@@ -81,31 +81,25 @@ int run(std::vector<const char *>& fuse_c_str, std::string& fileToMount)
 
 int main(int argc, char **argv)
 {
+	std::vector<const char *> fuse_c_str;
+
 	g_DebugMode = true;
 
 	if (argc != 3)
 		print_help(argv[0]);
 
-	std::string fileToMount(argv[1]);
-	std::string mountPoint(argv[2]);
+	const char* fileToMount = argv[1];
+	const char* mountPoint = argv[2];
 
-	std::vector<std::string> fuseOptions;
-	fuseOptions.push_back(argv[0]);
+	fuse_c_str.push_back(argv[0]);
 
 	if (g_DebugMode)
-		fuseOptions.push_back("-f");
-	fuseOptions.push_back("-o");
-	fuseOptions.push_back("default_permissions,use_ino,kernel_cache");
-	fuseOptions.push_back(mountPoint);
+		fuse_c_str.push_back("-f");
+	fuse_c_str.push_back("-o");
+	fuse_c_str.push_back("default_permissions,use_ino,kernel_cache");
+	fuse_c_str.push_back(mountPoint);
 
-	std::vector<const char *> fuse_c_str;
-	for (unsigned int i = 0; i < fuseOptions.size(); ++i)
-	{
-		fuse_c_str.push_back((fuseOptions[i].c_str()));
-	}
-
-	chdir(mountPoint.c_str());
-	umask(0);
+	chdir(mountPoint);
 
 	return run(fuse_c_str, fileToMount);
 }
