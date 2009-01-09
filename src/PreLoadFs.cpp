@@ -232,7 +232,7 @@ int PreLoadFs::read(const char *name, char *buf, size_t len, off_t offset, struc
 	char *orig_buf = buf;
 
 	if (g_DebugMode)
-		std::cout << __PRETTY_FUNCTION__<< std::hex <<"offset: " << offset << ", len: " << len << std::endl;
+		std::cout << __PRETTY_FUNCTION__<< std::hex <<"offset: " << offset << ", len: " << len << ", m_offset: " << m_offset << std::endl;
 
 	/** File name of the mounted file.
 	**/
@@ -287,6 +287,10 @@ int PreLoadFs::read(const char *name, char *buf, size_t len, off_t offset, struc
 		buf += r;
 		len -= r;
 
+		/** Advance offset.
+		**/
+		m_offset += r;
+
 		/** Detect exception only if there are no data in the buffer.
 		**/
 		if (r == 0)
@@ -297,14 +301,19 @@ int PreLoadFs::read(const char *name, char *buf, size_t len, off_t offset, struc
 			{
 				if (m_error != 0)
 				{
+					//Error detected when read...
+
 					pthread_mutex_unlock(&m_mutex);
 
 					assert(m_error > 0);
 					return -m_error;
 				}
+
+				// Just end of file...
+
+				pthread_mutex_unlock(&m_mutex);
+				break;
 			}
-			pthread_mutex_unlock(&m_mutex);
-			break;
 		}
 		/** Let know the thread that it can read new data.
 		**/
@@ -316,10 +325,6 @@ int PreLoadFs::read(const char *name, char *buf, size_t len, off_t offset, struc
 	/** Compute total bytes read.
 	**/
 	int t = buf - orig_buf;
-
-	/** Advance offset.
-	**/
-	m_offset += t;
 
 	/** Return total bytes read.
 	**/
@@ -337,10 +342,7 @@ void *PreLoadFs::runT(void *arg)
 
 void PreLoadFs::run()
 {
-	/** Local buffer size at most 4096 bytes
-	**/
-	int buf_size = std::min(4096, m_buffer.size());
-	buf_size = 4096;
+	int buf_size = 4096;
 
 	/** FIX: This is memory leak. We ignore it now because
 	 *       if this thread is canceled the whole application
@@ -350,8 +352,6 @@ void PreLoadFs::run()
 
 	while (true)
 	{
-		int freeBytes = 0;
-
 		pthread_mutex_lock(&m_mutex);
 
 		/** Wait until buffer is not full or exception is resolved.
@@ -364,10 +364,6 @@ void PreLoadFs::run()
 
 			pthread_cond_wait(&m_wakeupReadNewData, &m_mutex);
 		}
-
-		/** Get number of bytes that may be stored in the buffer.
-		**/
-		freeBytes = m_buffer.free();
 
 		if (m_seeked == true)
 			m_seeked = false;
@@ -382,9 +378,9 @@ void PreLoadFs::run()
 		 *  cancel download imediately.
 		**/
 //		if (g_DebugMode)
-//			std::cout << __PRETTY_FUNCTION__ << "..reading: " << std::min(buf_size, freeBytes) << std::endl;
+//			std::cout << __PRETTY_FUNCTION__ << "..reading: " << buf_size << std::endl;
 
-		int r = ::pread(m_fd, buf, std::min(buf_size, freeBytes), offset);
+		int r = ::pread(m_fd, buf, buf_size, offset);
 
 		if (g_DebugMode)
 			std::cout << __PRETTY_FUNCTION__ << "..read: " << r << std::endl;
