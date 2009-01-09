@@ -2,6 +2,7 @@
 #include <errno.h>
 #include <algorithm>
 #include <iostream>
+#include <assert.h>
 
 CBuffer::CBuffer(int bufferSize) :
 	m_readP(0),
@@ -23,7 +24,6 @@ void CBuffer::clear()
 int CBuffer::free() const
 {
 	int free;
-
 	if (m_full)
 		free = 0;
 	else if (m_empty)
@@ -32,22 +32,13 @@ int CBuffer::free() const
 		free = m_bufferSize - m_writeP + m_readP;
 	else
 		free = m_readP - m_writeP;
-
-	std::cerr << __PRETTY_FUNCTION__ << std::endl;
-	std::cerr << m_bufferSize << ", read: " << m_readP << ", write: " << m_writeP << " => " << free << std::endl;
-
 	return free;
 }
 
 int CBuffer::full() const
 {
 	int full;
-
 	full = m_bufferSize - free();
-
-	std::cerr << __PRETTY_FUNCTION__ << std::endl;
-	std::cerr << m_bufferSize << ", read: " << m_readP << ", write: " << m_writeP << " => " << full << std::endl;
-
 	return full;
 }
 
@@ -78,6 +69,18 @@ int CBuffer::get(char *buf, int len)
 	return buf - orig_buf;
 }
 
+void CBuffer::advance(int offset)
+{
+	assert(offset <= full());
+
+	m_readP += offset;
+	if (m_readP >= m_bufferSize)
+		m_readP -= m_bufferSize;
+	if (m_readP == m_writeP)
+		m_empty = true;
+	m_full = false;
+}
+
 int CBuffer::put(char *buf, int len)
 {
 	char *orig_buf = buf;
@@ -103,5 +106,25 @@ int CBuffer::put(char *buf, int len)
 		m_empty = false;
 	}
 	return buf - orig_buf;
+}
+
+bool CBuffer::isFree() const
+{
+	return m_empty;
+}
+
+bool CBuffer::isFull() const
+{
+	return m_full;
+}
+
+bool CBuffer::isAlmostFull() const
+{
+	return full() * 4 > size();
+}
+
+int CBuffer::size() const
+{
+	return m_bufferSize;
 }
 

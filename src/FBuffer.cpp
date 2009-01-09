@@ -3,6 +3,7 @@
 #include <unistd.h>
 #include <iostream>
 #include <vector>
+#include <iostream>
 
 FBuffer::FBuffer(std::string path, int bufferSize) :
 	CBuffer(bufferSize)

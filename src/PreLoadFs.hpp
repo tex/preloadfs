@@ -52,6 +52,11 @@ private:
 	 **/
 	off_t           m_offset;
 
+	/** Read offset. Used when read in thread and seek.
+	 *
+	 **/
+	off_t          m_offsetBuf;
+
 	/** Buffer.
 	**/
 	FBuffer         m_buffer;

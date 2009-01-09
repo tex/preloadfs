@@ -5,6 +5,9 @@
  *  License: GPLv2
  *  (c) Milan Svoboda, 2008
 **/
+
+#include <ostream>
+
 class CBuffer
 {
 public:
@@ -34,23 +37,23 @@ public:
 	 **/
 	int free() const;
 
-	bool isFree() const { return m_empty; }
+	bool isFree() const;
 
 	/** Return size of occupied buffer space in bytes.
 	 *  @return size of occupied buffer space in bytes
 	**/
 	int full() const;
 
-	bool isFull() const { return m_full; }
+	bool isFull() const;
 
-	bool isAlmostFull() const { return full() * 4 / 3 > size(); }
+	bool isAlmostFull() const;
 
 	/** Return size of buffer in bytes.
 	 *  @return size of buffer in bytes
 	 **/
-	int size() const { return m_bufferSize; }
+	int size() const;
 
-	void advance(int offset) { m_readP += offset; }
+	void advance(int offset);
 
 private:
 	/** Really read data from backed storage (may be memory,
