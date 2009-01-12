@@ -55,6 +55,8 @@ public:
 
 	void advance(int offset);
 
+	void stats();
+
 private:
 	/** Really read data from backed storage (may be memory,
 	 *  file or ...). This method must be implemented by

@@ -265,6 +265,9 @@ int PreLoadFs::read(const char *name, char *buf, size_t len, off_t offset, struc
 	{
 		pthread_mutex_lock(&m_mutex);
 
+		if (g_DebugMode)
+			m_buffer.stats();
+
 		while (!m_buffer.isAlmostFull() && (m_wasAlmostFull == false) && (m_exception == false))
 		{
 			if (g_DebugMode)
@@ -365,6 +368,9 @@ void PreLoadFs::run()
 	while (true)
 	{
 		pthread_mutex_lock(&m_mutex);
+
+		if (g_DebugMode)
+			m_buffer.stats();
 
 		/** Wait until buffer is not full or exception is resolved.
 		**/
