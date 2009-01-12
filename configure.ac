@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ(2.59)
-AC_INIT(FuseHttp, 2.0, milan.svoboda@centrum.cz)
+AC_INIT(preLoadFs, 2.0, milan.svoboda@centrum.cz)
 AM_INIT_AUTOMAKE([foreign])
 AC_CONFIG_HEADER([config.h])
 AC_CONFIG_SRCDIR([.])
@@ -71,20 +71,20 @@ AC_CHECK_LIB(fuse,fuse_main,,
 	export LDFLAGS=-L/usr/local/lib ])],)
 
 # Check for a supported FUSE_MAJOR_VERSION.
-AC_MSG_CHECKING([For supported FUSE API version])
-AC_RUN_IFELSE([ 
-    AC_LANG_PROGRAM([[#include <fuse.h>]],
-[[
-    if(FUSE_MAJOR_VERSION == 2 && FUSE_MINOR_VERSION >= 5)
-	return 0;
-    else
-	return -1;
-]])], 
-    [AC_MSG_RESULT([yes])],
-    [AC_MSG_RESULT([no])
-    AC_MSG_FAILURE([FuseCompress requires FUSE 2.5 or newer.])
-    ]
-)
+#AC_MSG_CHECKING([For supported FUSE API version])
+#AC_RUN_IFELSE([ 
+#    AC_LANG_PROGRAM([[#include <fuse.h>]],
+#[[
+#    if(FUSE_MAJOR_VERSION == 2 && FUSE_MINOR_VERSION >= 5)
+#	return 0;
+#    else
+#	return -1;
+#]])], 
+#    [AC_MSG_RESULT([yes])],
+#    [AC_MSG_RESULT([no])
+#    AC_MSG_FAILURE([FuseCompress requires FUSE 2.5 or newer.])
+#    ]
+#)
 
 AC_ARG_ENABLE(profile,
     AC_HELP_STRING([--enable-profile],
@@ -111,18 +111,6 @@ AC_TYPE_OFF_T
 AC_C_RESTRICT
 AC_TYPE_SIZE_T
 AC_CHECK_TYPES([ptrdiff_t])
-
-# Checks for library functions.
-AC_FUNC_CHOWN
-AC_FUNC_CLOSEDIR_VOID
-AC_FUNC_LSTAT
-AC_FUNC_LSTAT_FOLLOWS_SLASHED_SYMLINK
-AC_FUNC_MALLOC
-AC_FUNC_MEMCMP
-AC_FUNC_REALLOC
-AC_FUNC_STAT
-AC_FUNC_UTIME_NULL
-AC_CHECK_FUNCS([fchdir fdatasync ftruncate lchown memmove memset mkdir rmdir strchr strerror utime])
 
 # Tell Makefile.am to process following subdirectories
 subdirs="src"
