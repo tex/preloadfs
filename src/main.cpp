@@ -33,7 +33,17 @@ void print_help(const char *name)
 	exit(EXIT_FAILURE);
 }
 
-int Getattr (const char *name, struct stat *stat)
+void *Init()
+{
+	return g_PreLoadFs->init();
+}
+
+void Destroy(void *arg)
+{
+	return g_PreLoadFs->destroy(arg);
+}
+
+int Getattr(const char *name, struct stat *stat)
 {
 	return g_PreLoadFs->getattr(name, stat);
 }
@@ -70,6 +80,8 @@ int run(std::vector<const char *>& fuse_c_str, const char* fileToMount, const ch
 	struct fuse_operations ops;
 	memset(&ops, 0, sizeof ops);
 
+	ops.init = Init;
+	ops.destroy = Destroy;
 	ops.getattr = Getattr;
 	ops.readdir = Readdir;
 	ops.open = Open;
@@ -83,7 +95,7 @@ int main(int argc, char **argv)
 {
 	std::vector<const char *> fuse_c_str;
 
-	g_DebugMode = true;
+	g_DebugMode = false;
 
 	if (argc != 5)
 		print_help(argv[0]);

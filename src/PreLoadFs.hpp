@@ -15,6 +15,9 @@ public:
 	PreLoadFs(std::string tmpPath, size_t tmpSize, std::string fileToMount);
 	~PreLoadFs();
 
+	void *init();
+	void destroy(void *arg);
+
 	int getattr (const char *, struct stat *);
 	int readdir (const char *, void *, fuse_fill_dir_t, off_t, struct fuse_file_info *);
 

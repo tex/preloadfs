@@ -21,6 +21,14 @@ PreLoadFs::PreLoadFs(std::string tmpPath, size_t tmpSize, std::string fileToMoun
 	m_seeked(false),
 	m_wasAlmostFull(false)
 {
+}
+
+PreLoadFs::~PreLoadFs()
+{
+}
+
+void *PreLoadFs::init()
+{
 	/** We are read only buffering 'filesystem'. So we open
 	 *  a file as read only.
 	**/
@@ -37,9 +45,10 @@ PreLoadFs::PreLoadFs(std::string tmpPath, size_t tmpSize, std::string fileToMoun
 			m_fd = -1;
 		}
 	}
+	return NULL;
 }
 
-PreLoadFs::~PreLoadFs()
+void PreLoadFs::destroy(void *arg)
 {
 	if (m_fd != -1)
 	{
@@ -172,8 +181,8 @@ int PreLoadFs::seek(off_t offset)
 
 	if ((m_offset < offset) && (m_offset + m_buffer.full() > offset))
 	{
-//		if (g_DebugMode)
-//			std::cout << __PRETTY_FUNCTION__ << " fast m_offset:" << m_offset << ", offset:" << offset << ", ->" << m_offset + m_buffer.full() << std::endl;
+		if (g_DebugMode)
+			std::cout << __PRETTY_FUNCTION__ << " fast m_offset:" << m_offset << ", offset:" << offset << ", ->" << m_offset + m_buffer.full() << std::endl;
 
 		/** There are data in the buffer covering required offset.
 		**/
@@ -258,10 +267,10 @@ int PreLoadFs::read(const char *name, char *buf, size_t len, off_t offset, struc
 
 		while (!m_buffer.isAlmostFull() && (m_wasAlmostFull == false) && (m_exception == false))
 		{
-//			if (g_DebugMode)
-//				std::cout << __PRETTY_FUNCTION__ << ", isAlmostFull: " << m_buffer.isAlmostFull() <<
-//				                                    ", wasAlmostFull: " << m_wasAlmostFull <<
-//				                                    ", exception: " << m_exception << std::endl;
+			if (g_DebugMode)
+				std::cout << __PRETTY_FUNCTION__ << ", isAlmostFull: " << m_buffer.isAlmostFull() <<
+				                                    ", wasAlmostFull: " << m_wasAlmostFull <<
+				                                    ", exception: " << m_exception << std::endl;
 
 			/** Wait for a new data if buffer is not almost full or exception
 			 *  is detected (when exception is detected there will be no more
@@ -278,11 +287,14 @@ int PreLoadFs::read(const char *name, char *buf, size_t len, off_t offset, struc
 		**/
 		int r = m_buffer.get(buf, len);
 
-//		if (g_DebugMode)
-//			std::cout << __PRETTY_FUNCTION__ << ", get returned: " << r << " (" << strerror(errno) << ")" << std::endl;
+		if (g_DebugMode)
+			std::cout << __PRETTY_FUNCTION__ << ", get returned: " << r << " (" << strerror(errno) << ")" << std::endl;
 
 		if (r == -1)
+		{
+			pthread_mutex_unlock(&m_mutex);
 			break;
+		}
 
 		buf += r;
 		len -= r;
@@ -358,9 +370,9 @@ void PreLoadFs::run()
 		**/
 		while (m_buffer.isFull() || (m_exception == true))
 		{
-//			if (g_DebugMode)
-//				std::cout << __PRETTY_FUNCTION__ << ", isFull: " << m_buffer.isFull() <<
-//			                                            ", exception: " << m_exception << std::endl;
+			if (g_DebugMode)
+				std::cout << __PRETTY_FUNCTION__ << ", isFull: " << m_buffer.isFull() <<
+			                                            ", exception: " << m_exception << std::endl;
 
 			pthread_cond_wait(&m_wakeupReadNewData, &m_mutex);
 		}
@@ -377,8 +389,8 @@ void PreLoadFs::run()
 		 *  TODO: This should be rewritten to use select to be able to
 		 *  cancel download imediately.
 		**/
-//		if (g_DebugMode)
-//			std::cout << __PRETTY_FUNCTION__ << "..reading: " << buf_size << std::endl;
+		if (g_DebugMode)
+			std::cout << __PRETTY_FUNCTION__ << "..reading: " << buf_size << std::endl;
 
 		int r = ::pread(m_fd, buf, buf_size, offset);
 
@@ -389,8 +401,8 @@ void PreLoadFs::run()
 
 		if (m_seeked == true)
 		{
-//			if (g_DebugMode)
-//				std::cout << __PRETTY_FUNCTION__ << "..seeked...continue" << std::endl;
+			if (g_DebugMode)
+				std::cout << __PRETTY_FUNCTION__ << "..seeked...continue" << std::endl;
 
 			m_seeked = false;
 
@@ -422,8 +434,8 @@ void PreLoadFs::run()
 		{
 			m_offsetBuf += r;
 
-//			if (g_DebugMode)
-//				std::cout << __PRETTY_FUNCTION__ << "..pushing" << std::endl;
+			if (g_DebugMode)
+				std::cout << __PRETTY_FUNCTION__ << "..pushing" << std::endl;
 
 			/** Store data to the buffer.
 			**/
@@ -435,6 +447,8 @@ void PreLoadFs::run()
 				**/
 				m_exception = true;
 				m_error = errno;
+
+				pthread_mutex_unlock(&m_mutex);
 				break;
 			}
 			assert(t == r);
