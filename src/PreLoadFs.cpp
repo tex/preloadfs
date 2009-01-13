@@ -341,6 +341,9 @@ int PreLoadFs::read(const char *name, char *buf, size_t len, off_t offset, struc
 	**/
 	int t = buf - orig_buf;
 
+	if (g_DebugMode)
+		std::cout << __PRETTY_FUNCTION__ << ", total ret: " << t << std::endl;
+
 	/** Return total bytes read.
 	**/
 	return t;
@@ -357,7 +360,7 @@ void *PreLoadFs::runT(void *arg)
 
 void PreLoadFs::run()
 {
-	int buf_size = 4096;
+	int buf_size = std::min(4096, m_buffer.size());
 
 	/** FIX: This is memory leak. We ignore it now because
 	 *       if this thread is canceled the whole application
