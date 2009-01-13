@@ -391,6 +391,8 @@ void PreLoadFs::run()
 
 		off_t offset = m_offsetBuf;
 
+		int toRead = std::min(buf_size, m_buffer.free());
+
 		pthread_mutex_unlock(&m_mutex);
 
 		/** This read() may take a long time, thus we don't hold
@@ -399,9 +401,9 @@ void PreLoadFs::run()
 		 *  cancel download imediately.
 		**/
 		if (g_DebugMode)
-			std::cout << __PRETTY_FUNCTION__ << "..reading: " << buf_size << std::endl;
+			std::cout << __PRETTY_FUNCTION__ << "..reading: " << toRead << std::endl;
 
-		int r = ::pread(m_fd, buf, buf_size, offset);
+		int r = ::pread(m_fd, buf, toRead, offset);
 
 		if (g_DebugMode)
 			std::cout << __PRETTY_FUNCTION__ << "..read: " << r << std::endl;
