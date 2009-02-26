@@ -1,7 +1,7 @@
 #ifndef CACHEFS_HPP
 #define CACHEFS_HPP
 
-#include "FBuffer.hpp"
+#include "MBuffer.hpp"
 #include <fuse.h>
 #include <pthread.h>
 #include <boost/filesystem.hpp>
@@ -62,7 +62,7 @@ private:
 
 	/** Buffer.
 	**/
-	FBuffer         m_buffer;
+	MBuffer         m_buffer;
 
 	/** Thread used to pre-read content of the file.
 	**/

@@ -3,12 +3,14 @@ bin_PROGRAMS = preloadfs
 common = \
 	PreLoadFs.cpp \
 	CBuffer.cpp \
-	FBuffer.cpp
+	FBuffer.cpp \
+	MBuffer.cpp
 
 noinst_HEADERS = \
 	PreLoadFs.hpp \
 	CBuffer.hpp \
-	FBuffer.hpp
+	FBuffer.hpp \
+	MBuffer.hpp
 
 preloadfs_SOURCES = $(common) main.cpp
 

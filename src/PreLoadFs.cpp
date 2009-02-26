@@ -16,7 +16,7 @@ PreLoadFs::PreLoadFs(std::string tmpPath, size_t tmpSize, std::string fileToMoun
 	m_refs(0),
 	m_offset(0),
 	m_offsetBuf(0),
-	m_buffer(tmpPath, tmpSize),
+	m_buffer(/*tmpPath,*/ tmpSize),
 	m_exception(false),
 	m_seeked(false),
 	m_wasAlmostFull(false)

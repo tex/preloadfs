@@ -95,7 +95,7 @@ int main(int argc, char **argv)
 {
 	std::vector<const char *> fuse_c_str;
 
-	g_DebugMode = true;
+	g_DebugMode = false;
 
 	if (argc != 5)
 		print_help(argv[0]);
