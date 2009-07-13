@@ -2,6 +2,7 @@
 #define FBUFFER_HPP
 
 #include "CBuffer.hpp"
+#include <string>
 
 /** Implements CBuffer's read/write methods. Uses memory buffer as
  *  a back storage for circular buffer.
@@ -9,7 +10,7 @@
 class MBuffer : public CBuffer
 {
 public:
-	MBuffer(int bufferSize);
+	MBuffer(std::string, int bufferSize);
 	~MBuffer();
 
 private:
