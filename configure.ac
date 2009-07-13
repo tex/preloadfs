@@ -14,6 +14,7 @@ AC_PREFIX_DEFAULT([/usr/local])
 AC_PROG_CXX
 AC_PROG_CC
 AC_PROG_CPP
+AC_PROG_LN_S
 
 # Need to include any user specified flags in the tests below, as they might
 # specify required include directories..
@@ -23,6 +24,7 @@ CXXFLAGS="$CXXFLAGS $PTHREAD_CFLAGS $USER_INCLUDES"
 LDFLAGS="$LDFLAGS $PTHREAD_LIBS $USER_LDFLAGS"
 
 AX_BOOST_BASE([1.33.1])
+AX_BOOST_SYSTEM
 
 # Checks for libraries.
 AC_CHECK_LIB([pthread], [pthread_mutex_lock],,
@@ -70,21 +72,23 @@ AC_CHECK_LIB(fuse,fuse_main,,
 	and rerun configure, eg:
 	export LDFLAGS=-L/usr/local/lib ])],)
 
+PKG_CHECK_MODULES([FUSE], [fuse])
+
 # Check for a supported FUSE_MAJOR_VERSION.
-#AC_MSG_CHECKING([For supported FUSE API version])
-#AC_RUN_IFELSE([ 
-#    AC_LANG_PROGRAM([[#include <fuse.h>]],
-#[[
-#    if(FUSE_MAJOR_VERSION == 2 && FUSE_MINOR_VERSION >= 5)
-#	return 0;
-#    else
-#	return -1;
-#]])], 
-#    [AC_MSG_RESULT([yes])],
-#    [AC_MSG_RESULT([no])
-#    AC_MSG_FAILURE([FuseCompress requires FUSE 2.5 or newer.])
-#    ]
-#)
+AC_MSG_CHECKING([For supported FUSE API version])
+AC_RUN_IFELSE([ 
+    AC_LANG_PROGRAM([[#include <fuse.h>]],
+[[
+    if(FUSE_MAJOR_VERSION == 2 && FUSE_MINOR_VERSION >= 5)
+	return 0;
+    else
+	return -1;
+]])], 
+    [AC_MSG_RESULT([yes])],
+    [AC_MSG_RESULT([no])
+    AC_MSG_FAILURE([FuseCompress requires FUSE 2.5 or newer.])
+    ]
+)
 
 AC_ARG_ENABLE(profile,
     AC_HELP_STRING([--enable-profile],

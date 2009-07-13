@@ -13,6 +13,7 @@ noinst_HEADERS = \
 	MBuffer.hpp
 
 preloadfs_SOURCES = $(common) main.cpp
+preloadfs_LDADD = $(BOOST_SYSTEM_LIB) $(FUSE_LIBS)
 
 AM_CXXFLAGS = $(BOOST_CXXFLAGS)
 
