@@ -329,13 +329,7 @@ void *PreLoadFs::runT(void *arg)
 void PreLoadFs::run()
 {
 	off_t offset = 0;
-
-	int buf_size = std::min(4096, m_buffer.size());
-
-	/** FIX: This is memory leak. We ignore it now because
-	 *       if this thread is canceled the whole application
-	 *       exits.
-	 **/
+	int   buf_size = std::min(4096, m_buffer.size());
 	char* buf = new char[buf_size];
 
 	pthread_mutex_lock(&m_mutex);
@@ -433,12 +427,12 @@ void PreLoadFs::run()
 			}
 			assert(t == r);
 		}
-
 		/** Signal that there are new data available (or error).
 		**/
 		pthread_cond_signal(&m_wakeupNewData);
 	}
-
 	pthread_mutex_unlock(&m_mutex);
+
+	delete buf;
 }
 
