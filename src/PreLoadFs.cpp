@@ -16,8 +16,7 @@ PreLoadFs::PreLoadFs(std::string tmpPath, size_t tmpSize, std::string fileToMoun
 	m_offset(0),
 	m_buffer(tmpPath, tmpSize),
 	m_exception(false),
-	m_seeked(false),
-	m_wasAlmostFull(false)
+	m_seeked(false)
 {
 }
 
@@ -136,7 +135,7 @@ int PreLoadFs::open(const char *name, struct fuse_file_info *fi)
 		return -ENOENT;
 
 	/** Allow to open only if we sucessfuly opened the file.
-	 **/
+	**/
 	if (m_fd == -1)
 		return -ENOENT;
 
@@ -239,15 +238,9 @@ int PreLoadFs::read(const char *name, char *buf, size_t len, off_t offset, struc
 		if (g_DebugMode)
 			m_buffer.stats();
 
-		while (!m_buffer.isAlmostFull() && (m_wasAlmostFull == false) && (m_exception == false))
+		while (m_buffer.isFree() && (m_exception == false))
 		{
-			m_buffer.stats();
-			if (g_DebugMode)
-				std::cout << __PRETTY_FUNCTION__ << ", isAlmostFull: " << m_buffer.isAlmostFull() <<
-				                                    ", wasAlmostFull: " << m_wasAlmostFull <<
-				                                    ", exception: " << m_exception << std::endl;
-
-			/** Wait for a new data if buffer is not almost full or exception
+			/** Wait for a new data if buffer is empty or exception
 			 *  is detected (when exception is detected there will be no more
 			 *  data so we have to read what's available because there will
 			 *  not be any new data.
@@ -255,9 +248,6 @@ int PreLoadFs::read(const char *name, char *buf, size_t len, off_t offset, struc
 			pthread_cond_wait(&m_wakeupNewData, &m_mutex);
 		}
 
-		if (m_buffer.isAlmostFull())
-			m_wasAlmostFull = true;
- 
 		/** Read data from buffer.
 		**/
 		int r = m_buffer.get(buf, len);
@@ -279,8 +269,6 @@ int PreLoadFs::read(const char *name, char *buf, size_t len, off_t offset, struc
 		**/
 		if (r == 0)
 		{
-			m_wasAlmostFull = false;
-
 			if (m_exception == true)
 			{
 				if (m_error != 0)
@@ -367,7 +355,7 @@ void PreLoadFs::run()
 			std::cout << __PRETTY_FUNCTION__ << "..reading: " << readBytes << std::endl;
 
 		int r = ::pread(m_fd, buf, readBytes, offset);
-
+usleep(rand()/1000/100*3);
 		if (g_DebugMode)
 			std::cout << __PRETTY_FUNCTION__ << "..read: " << r << std::endl;
 

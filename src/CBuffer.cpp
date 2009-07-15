@@ -123,11 +123,6 @@ bool CBuffer::isFull() const
 	return m_full;
 }
 
-bool CBuffer::isAlmostFull() const
-{
-	return full() * 4 > size();
-}
-
 int CBuffer::size() const
 {
 	return m_bufferSize;

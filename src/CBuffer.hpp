@@ -46,8 +46,6 @@ public:
 
 	bool isFull() const;
 
-	bool isAlmostFull() const;
-
 	/** Return size of buffer in bytes.
 	 *  @return size of buffer in bytes
 	 **/

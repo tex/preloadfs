@@ -92,8 +92,6 @@ private:
 	 *  cleared only in run().
 	 **/
 	bool            m_seeked;
-
-	bool            m_wasAlmostFull;
 };
 
 #endif
