@@ -15,7 +15,6 @@ PreLoadFs::PreLoadFs(std::string tmpPath, size_t tmpSize, std::string fileToMoun
 	m_name(fileToMount),
 	m_refs(0),
 	m_offset(0),
-	m_offsetBuf(0),
 	m_buffer(tmpPath, tmpSize),
 	m_exception(false),
 	m_seeked(false),
@@ -33,7 +32,6 @@ void *PreLoadFs::init()
 	 *  a file as read only.
 	**/
 	m_fd = ::open(m_name.string().c_str(), O_RDONLY);
-
 	if (m_fd != -1)
 	{
 		int r = pthread_create(&m_thread, NULL, &PreLoadFs::runT, this);
@@ -70,9 +68,6 @@ int PreLoadFs::getattr(const char *name, struct stat *st)
 	int r = 0;
 
 	memset(st, 0, sizeof(struct stat));
-
-	if (g_DebugMode)
-		std::cout << __PRETTY_FUNCTION__ << ", name: " << name << std::endl;
 
 	if (name[0] == '/')
 		++name;
@@ -168,45 +163,32 @@ int PreLoadFs::release(const char *name, struct fuse_file_info * /*fi*/)
 	return 0;
 }
 
-int PreLoadFs::seek(off_t offset)
+/**
+ * m_mutex must be locked
+**/
+void PreLoadFs::seek(off_t offset)
 {
 	assert(m_offset != offset);
 
 	if (g_DebugMode)
 		std::cout << __PRETTY_FUNCTION__ << " " << offset << std::endl;
 
-	pthread_mutex_lock(&m_mutex);
-
-	off_t r;
-
 	if ((m_offset < offset) && (m_offset + m_buffer.full() > offset))
 	{
 		if (g_DebugMode)
-			std::cout << __PRETTY_FUNCTION__ << " fast m_offset:" << m_offset << ", offset:" << offset << ", ->" << m_offset + m_buffer.full() << std::endl;
+			std::cout << __PRETTY_FUNCTION__ << " fast m_offset:" << m_offset
+			          << ", offset:" << offset << ", ->" << m_offset + m_buffer.full() << std::endl;
 
 		/** There are data in the buffer covering required offset.
 		**/
 		assert(offset - m_offset > 0);
 		m_buffer.advance(offset - m_offset);
-		r = offset;
 	}
 	else
 	{
 		/** Clear the circular buffer.
 		**/
 		m_buffer.clear();
-
-		/** Seek to required position in opened file.
-		**/
-		r = ::lseek(m_fd, offset, SEEK_SET);
-		if (r == (off_t) -1)
-		{
-			/** lseek() failed, unlock mutex and return
-			 *  error return value.
-			**/
-			pthread_mutex_unlock(&m_mutex);
-			return -errno;
-		}
 
 		/** Set flag to let know the thread that we seeked to
 		 *  a new offset (It has to eventually discard data
@@ -219,21 +201,15 @@ int PreLoadFs::seek(off_t offset)
 		 *  file detected, so seek should clear this exception.
 		**/
 		m_exception = false;
-
-		m_offsetBuf = r;
 	}
 
 	/** Set offset to new value.
 	**/
-	m_offset = r;
+	m_offset = offset;
 
-	m_wasAlmostFull = false;
-
-	/** Let know the thread that it can read new data.
+	/** Let know the thread that it shall read new data.
 	**/
 	pthread_cond_signal(&m_wakeupReadNewData);
-	pthread_mutex_unlock(&m_mutex);
-	return 0;
 }
 
 int PreLoadFs::read(const char *name, char *buf, size_t len, off_t offset, struct fuse_file_info * /*fi*/)
@@ -241,7 +217,8 @@ int PreLoadFs::read(const char *name, char *buf, size_t len, off_t offset, struc
 	char *orig_buf = buf;
 
 	if (g_DebugMode)
-		std::cout << __PRETTY_FUNCTION__<< std::hex <<"offset: " << offset << ", len: " << len << ", m_offset: " << m_offset << std::endl;
+		std::cout << __PRETTY_FUNCTION__<< "offset: " << offset
+		          << ", len: " << len << ", m_offset: " << m_offset << std::endl;
 
 	/** File name of the mounted file.
 	**/
@@ -251,25 +228,21 @@ int PreLoadFs::read(const char *name, char *buf, size_t len, off_t offset, struc
 	**/
 	assert(tmp.string().compare(&name[1]) == 0);
 
-	/** Perform seek if user wants to read from offset
-	 *  different than we have currently.
+	pthread_mutex_lock(&m_mutex);
+
+	/** Seek if user wants to read from offset different than we currently have.
 	**/
 	if (m_offset != offset)
-	{
-		int r = seek(offset);
-		if (r != 0)
-			return r;
-	}
+		seek(offset);
 
 	while (len > 0)
 	{
-		pthread_mutex_lock(&m_mutex);
-
 		if (g_DebugMode)
 			m_buffer.stats();
 
 		while (!m_buffer.isAlmostFull() && (m_wasAlmostFull == false) && (m_exception == false))
 		{
+			m_buffer.stats();
 			if (g_DebugMode)
 				std::cout << __PRETTY_FUNCTION__ << ", isAlmostFull: " << m_buffer.isAlmostFull() <<
 				                                    ", wasAlmostFull: " << m_wasAlmostFull <<
@@ -294,10 +267,7 @@ int PreLoadFs::read(const char *name, char *buf, size_t len, off_t offset, struc
 			std::cout << __PRETTY_FUNCTION__ << ", get returned: " << r << " (" << strerror(errno) << ")" << std::endl;
 
 		if (r == -1)
-		{
-			pthread_mutex_unlock(&m_mutex);
 			break;
-		}
 
 		buf += r;
 		len -= r;
@@ -316,26 +286,25 @@ int PreLoadFs::read(const char *name, char *buf, size_t len, off_t offset, struc
 			{
 				if (m_error != 0)
 				{
-					//Error detected when read...
-
+					/** Error detected when read...
+					**/
 					pthread_mutex_unlock(&m_mutex);
 
 					assert(m_error > 0);
 					return -m_error;
 				}
 
-				// Just end of file...
-
-				pthread_mutex_unlock(&m_mutex);
+				/** Just end of the file...
+				**/
 				break;
 			}
 		}
+
 		/** Let know the thread that it can read new data.
 		**/
 		pthread_cond_signal(&m_wakeupReadNewData);
-
-		pthread_mutex_unlock(&m_mutex);
 	}
+	pthread_mutex_unlock(&m_mutex);
 
 	/** Compute total bytes read.
 	**/
@@ -360,6 +329,8 @@ void *PreLoadFs::runT(void *arg)
 
 void PreLoadFs::run()
 {
+	off_t offset = 0;
+
 	int buf_size = std::min(4096, m_buffer.size());
 
 	/** FIX: This is memory leak. We ignore it now because
@@ -368,10 +339,10 @@ void PreLoadFs::run()
 	 **/
 	char* buf = new char[buf_size];
 
+	pthread_mutex_lock(&m_mutex);
+
 	while (true)
 	{
-		pthread_mutex_lock(&m_mutex);
-
 		if (g_DebugMode)
 			m_buffer.stats();
 
@@ -387,23 +358,22 @@ void PreLoadFs::run()
 		}
 
 		if (m_seeked == true)
+		{
 			m_seeked = false;
+			offset = m_offset;
+		}
 
-		off_t offset = m_offsetBuf;
-
-		int toRead = std::min(buf_size, m_buffer.free());
+		int readBytes = std::min(buf_size, m_buffer.free());
 
 		pthread_mutex_unlock(&m_mutex);
 
 		/** This read() may take a long time, thus we don't hold
 		 *  the mutex.
-		 *  TODO: This should be rewritten to use select to be able to
-		 *  cancel download imediately.
 		**/
 		if (g_DebugMode)
-			std::cout << __PRETTY_FUNCTION__ << "..reading: " << toRead << std::endl;
+			std::cout << __PRETTY_FUNCTION__ << "..reading: " << readBytes << std::endl;
 
-		int r = ::pread(m_fd, buf, toRead, offset);
+		int r = ::pread(m_fd, buf, readBytes, offset);
 
 		if (g_DebugMode)
 			std::cout << __PRETTY_FUNCTION__ << "..read: " << r << std::endl;
@@ -416,11 +386,10 @@ void PreLoadFs::run()
 				std::cout << __PRETTY_FUNCTION__ << "..seeked...continue" << std::endl;
 
 			m_seeked = false;
-
-			pthread_mutex_unlock(&m_mutex);
+			offset = m_offset;
 
 			/** User seeked before we stored data in the buffer,
-			 *  by continue we discard them and start again.
+			 *  by continue we discard it and start again.
 			**/
 			continue;
 		}
@@ -443,7 +412,7 @@ void PreLoadFs::run()
 		}
 		else
 		{
-			m_offsetBuf += r;
+			offset += r;
 
 			if (g_DebugMode)
 				std::cout << __PRETTY_FUNCTION__ << "..pushing" << std::endl;
@@ -459,7 +428,8 @@ void PreLoadFs::run()
 				m_exception = true;
 				m_error = errno;
 
-				pthread_mutex_unlock(&m_mutex);
+				/** Exit this thread.
+				**/
 				break;
 			}
 			assert(t == r);
@@ -468,8 +438,8 @@ void PreLoadFs::run()
 		/** Signal that there are new data available (or error).
 		**/
 		pthread_cond_signal(&m_wakeupNewData);
-
-		pthread_mutex_unlock(&m_mutex);
 	}
+
+	pthread_mutex_unlock(&m_mutex);
 }
 

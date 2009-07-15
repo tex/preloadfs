@@ -36,7 +36,7 @@ private:
 	**/
 	void run();
 
-	int seek(off_t offset);
+	void seek(off_t offset);
 
 	/** Name of pre-loaded (mounted) file.
 	**/
@@ -54,11 +54,6 @@ private:
 	 *  is required or not.
 	 **/
 	off_t           m_offset;
-
-	/** Read offset. Used when read in thread and seek.
-	 *
-	 **/
-	off_t          m_offsetBuf;
 
 	/** Buffer.
 	**/

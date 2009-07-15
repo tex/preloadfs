@@ -96,6 +96,6 @@ private:
 
 	/** Contains size of the buffer in bytes
 	**/
-	int m_bufferSize;
+	const int m_bufferSize;
 };
 
