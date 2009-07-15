@@ -7,7 +7,6 @@
 #include <dirent.h>
 #include <string.h>
 #include <iostream>
-#include <boost/scoped_array.hpp>
 
 extern bool g_DebugMode;
 
