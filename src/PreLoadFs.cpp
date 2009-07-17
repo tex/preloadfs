@@ -400,9 +400,9 @@ void PreLoadFs::run()
 				m_exception = true;
 				m_error = errno;
 
-				/** Exit this thread.
+				/** Exit the application.
 				**/
-				break;
+				exit(EXIT_FAILURE);
 			}
 			assert(t == r);
 		}
@@ -410,8 +410,5 @@ void PreLoadFs::run()
 		**/
 		pthread_cond_signal(&m_wakeupNewData);
 	}
-	pthread_mutex_unlock(&m_mutex);
-
-	delete buf;
 }
 
