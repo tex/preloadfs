@@ -34,10 +34,8 @@ void *PreLoadFs::init()
 
 void PreLoadFs::destroy(void *arg)
 {
-	/** Cancel thread and wait to its termination.
+	/** Don't care about the thread, we are going to quit anyway.
 	**/
-	pthread_cancel(m_thread);
-	pthread_join(m_thread, NULL);
 
 	assert(m_refs == 0);
 }
