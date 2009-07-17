@@ -42,10 +42,6 @@ private:
 	**/
 	boost::filesystem::path m_name;
 
-	/** File desciptor of opened pre-loaded file.
-	**/
-	int             m_fd;
-
 	/** Reference counter
 	**/
 	int             m_refs;

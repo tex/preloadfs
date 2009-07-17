@@ -26,39 +26,20 @@ PreLoadFs::~PreLoadFs()
 
 void *PreLoadFs::init()
 {
-	/** We are read only buffering 'filesystem'. So we open
-	 *  a file as read only.
-	**/
-	m_fd = ::open(m_name.string().c_str(), O_RDONLY);
-	if (m_fd != -1)
-	{
-		int r = pthread_create(&m_thread, NULL, &PreLoadFs::runT, this);
-		if (r != 0)
-		{
-			/** Failed to create thread. Clean up used resources.
-			**/
-			::close(m_fd);
-			m_fd = -1;
-		}
-	}
+	int r = pthread_create(&m_thread, NULL, &PreLoadFs::runT, this);
+	if (r != 0)
+		exit(EXIT_FAILURE);
 	return NULL;
 }
 
 void PreLoadFs::destroy(void *arg)
 {
-	if (m_fd != -1)
-	{
-		/** Cancel thread and wait to its termination.
-		**/
-		pthread_cancel(m_thread);
-		pthread_join(m_thread, NULL);
-
-		close(m_fd);
-		m_fd = -1;
-	}
+	/** Cancel thread and wait to its termination.
+	**/
+	pthread_cancel(m_thread);
+	pthread_join(m_thread, NULL);
 
 	assert(m_refs == 0);
-	assert(m_fd == -1);
 }
 
 int PreLoadFs::getattr(const char *name, struct stat *st)
@@ -123,7 +104,7 @@ int PreLoadFs::readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_
 int PreLoadFs::open(const char *name, struct fuse_file_info *fi)
 {
 	if (g_DebugMode)
-		std::cout << __PRETTY_FUNCTION__ << ": m_fd: " << m_fd << std::endl;
+		std::cout << __PRETTY_FUNCTION__ << std::endl;
 
 	/** File name of the mounted file.
 	**/
@@ -132,11 +113,6 @@ int PreLoadFs::open(const char *name, struct fuse_file_info *fi)
 	/** Allow to open only our mounted file.
 	**/
 	if (tmp.string().compare(&name[1]) != 0)
-		return -ENOENT;
-
-	/** Allow to open only if we sucessfuly opened the file.
-	**/
-	if (m_fd == -1)
 		return -ENOENT;
 
 	/** Allow to open only in read only mode.
@@ -320,7 +296,24 @@ void PreLoadFs::run()
 	int   buf_size = std::min(4096, m_buffer.size());
 	char* buf = new char[buf_size];
 
+	/** We are read only buffering 'filesystem'. So we open
+	 *  a file as read only. And we do not care about closing
+	 *  it because the if this thread gets killed the
+	 *  whole application is going to end.
+	**/
+	int fd = ::open(m_name.string().c_str(), O_RDONLY);
+
 	pthread_mutex_lock(&m_mutex);
+
+	if (fd == -1)
+	{
+		m_exception = true;
+		m_error = errno;
+
+		/** Signal that there is an error.
+		**/
+		pthread_cond_signal(&m_wakeupNewData);
+	}
 
 	while (true)
 	{
@@ -354,8 +347,8 @@ void PreLoadFs::run()
 		if (g_DebugMode)
 			std::cout << __PRETTY_FUNCTION__ << "..reading: " << readBytes << std::endl;
 
-		int r = ::pread(m_fd, buf, readBytes, offset);
-usleep(rand()/1000/100*3);
+		int r = ::pread(fd, buf, readBytes, offset);
+
 		if (g_DebugMode)
 			std::cout << __PRETTY_FUNCTION__ << "..read: " << r << std::endl;
 
