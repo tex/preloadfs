@@ -26,9 +26,16 @@ PreLoadFs::~PreLoadFs()
 
 void *PreLoadFs::init()
 {
-	int r = pthread_create(&m_thread, NULL, &PreLoadFs::runT, this);
+	int r;
+
+	r = pthread_mutex_init(&m_mutex, NULL);
 	if (r != 0)
 		exit(EXIT_FAILURE);
+
+	r = pthread_create(&m_thread, NULL, &PreLoadFs::runT, this);
+	if (r != 0)
+		exit(EXIT_FAILURE);
+
 	return NULL;
 }
 
