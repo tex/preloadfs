@@ -35,6 +35,18 @@ void *PreLoadFs::init()
 	if (r != 0)
 		exit(EXIT_FAILURE);
 
+	r = pthread_cond_init(&m_wakeupNewData, NULL);
+	if (r != 0)
+		exit(EXIT_FAILURE);
+
+	r = pthread_cond_init(&m_wakeupReadNewData, NULL);
+	if (r != 0)
+		exit(EXIT_FAILURE);
+
+	r = pthread_cond_init(&m_wakeupStatAvailable, NULL);
+	if (r != 0)
+		exit(EXIT_FAILURE);
+
 	r = pthread_create(&m_thread, NULL, &PreLoadFs::runT, this);
 	if (r != 0)
 		exit(EXIT_FAILURE);
