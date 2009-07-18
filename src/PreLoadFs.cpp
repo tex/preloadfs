@@ -1,4 +1,6 @@
 #include "PreLoadFs.hpp"
+#include "Device.hpp"
+#include "DeviceFile.hpp"
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
@@ -16,7 +18,8 @@ PreLoadFs::PreLoadFs(std::string tmpPath, size_t tmpSize, std::string fileToMoun
 	m_offset(0),
 	m_buffer(tmpPath, tmpSize),
 	m_exception(false),
-	m_seeked(false)
+	m_seeked(false),
+	m_size(0)
 {
 }
 
@@ -64,23 +67,29 @@ int PreLoadFs::getattr(const char *name, struct stat *st)
 	}
 	else
 	{
+		st->st_gid = getgid();
+		st->st_uid = getuid();
+		st->st_mode = S_IFREG | S_IRUSR | S_IRGRP | S_IROTH;
+		st->st_nlink = 1;
+
 		/** File name of the mounted file.
 		**/
 		boost::filesystem::path tmp(m_name.leaf());
 		if (tmp.string().compare(name) == 0)
 		{
-			/** Get stats of mounted file
-			**/
-			r = ::stat(m_name.string().c_str(), st);
+			pthread_mutex_lock(&m_mutex);
+			while (m_size == 0)
+			{
+				pthread_cond_wait(&m_wakeupStatAvailable, &m_mutex);
+			}
+			st->st_size = m_size;
+			st->st_ino = 4;
+			pthread_mutex_unlock(&m_mutex);
 		}
 		else if (strcmp(name, ".stat") == 0)
 		{
-			st->st_gid = getgid();
-			st->st_uid = getuid();
 			st->st_size = 1024;
 			st->st_ino = 3;
-			st->st_mode = S_IFREG | S_IRUSR | S_IRGRP | S_IROTH;
-			st->st_nlink = 1;
 		}
 		else
 			/** Only mounted file is visible in mount point.
@@ -337,16 +346,22 @@ void PreLoadFs::run()
 	int   buf_size = std::min(128 * 1024, m_buffer.size());
 	char* buf = new char[buf_size];
 
+	Device *dev = new DeviceFile();
+
 	/** We are read only buffering 'filesystem'. So we open
 	 *  a file as read only. And we do not care about closing
 	 *  it because the if this thread gets killed the
 	 *  whole application is going to end.
 	**/
-	int fd = ::open(m_name.string().c_str(), O_RDONLY);
+	bool b = dev->open(m_name.string().c_str());
+
+	/** Get size of the file
+	**/
+	off_t size = dev->size();
 
 	pthread_mutex_lock(&m_mutex);
 
-	if (fd == -1)
+	if (b == false)
 	{
 		m_exception = true;
 		m_error = errno;
@@ -355,6 +370,9 @@ void PreLoadFs::run()
 		**/
 		pthread_cond_signal(&m_wakeupNewData);
 	}
+
+	m_size = size;
+	pthread_cond_signal(&m_wakeupStatAvailable);
 
 	while (true)
 	{
@@ -385,7 +403,7 @@ void PreLoadFs::run()
 		if (g_DebugMode)
 			std::cout << __PRETTY_FUNCTION__ << "..reading: " << readBytes << std::endl;
 
-		int r = ::pread(fd, buf, readBytes, offset);
+		int r = dev->pread(buf, readBytes, offset);
 
 		if (g_DebugMode)
 			std::cout << __PRETTY_FUNCTION__ << "..read: " << r << std::endl;

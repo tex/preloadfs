@@ -71,6 +71,8 @@ private:
 	 **/
 	pthread_cond_t  m_wakeupNewData;
 
+	pthread_cond_t	m_wakeupStatAvailable;
+
 	/** Mutex that protects every variables shared with thread.
 	**/
 	pthread_mutex_t m_mutex;
@@ -90,6 +92,8 @@ private:
 	 *  cleared only in run().
 	 **/
 	bool            m_seeked;
+
+	off_t		m_size;
 };
 
 #endif
