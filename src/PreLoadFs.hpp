@@ -26,6 +26,8 @@ public:
 	int read(const char *name, char *buf, size_t len, off_t offset, struct fuse_file_info *fi);
 
 private:
+	int stat(char *buf, size_t len);
+
 	/** "Trampoline" function just to execute run() in
 	 *  correct context.
 	**/

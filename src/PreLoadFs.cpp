@@ -67,12 +67,20 @@ int PreLoadFs::getattr(const char *name, struct stat *st)
 		/** File name of the mounted file.
 		**/
 		boost::filesystem::path tmp(m_name.leaf());
-
 		if (tmp.string().compare(name) == 0)
 		{
 			/** Get stats of mounted file
 			**/
 			r = ::stat(m_name.string().c_str(), st);
+		}
+		else if (strcmp(name, ".stat") == 0)
+		{
+			st->st_gid = getgid();
+			st->st_uid = getuid();
+			st->st_size = 1024;
+			st->st_ino = 3;
+			st->st_mode = S_IFREG | S_IRUSR | S_IRGRP | S_IROTH;
+			st->st_nlink = 1;
 		}
 		else
 			/** Only mounted file is visible in mount point.
@@ -100,6 +108,11 @@ int PreLoadFs::readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_
 	memset(&st, 0, sizeof(st));
 	st.st_ino = 3;
 	st.st_mode = S_IFREG;
+	filler(buf, ".stat", &st, 0);
+
+	memset(&st, 0, sizeof(st));
+	st.st_ino = 4;
+	st.st_mode = S_IFREG;
 	boost::filesystem::path tmp(m_name.leaf());
 	filler(buf, tmp.string().c_str(), &st, 0);
 
@@ -111,34 +124,50 @@ int PreLoadFs::open(const char *name, struct fuse_file_info *fi)
 	if (g_DebugMode)
 		std::cout << __PRETTY_FUNCTION__ << std::endl;
 
-	/** File name of the mounted file.
-	**/
-	boost::filesystem::path tmp(m_name.leaf());
-
-	/** Allow to open only our mounted file.
-	**/
-	if (tmp.string().compare(&name[1]) != 0)
-		return -ENOENT;
-
 	/** Allow to open only in read only mode.
 	**/
 	if ((fi->flags & 3) != O_RDONLY)
 		return -EACCES;
 
-	++m_refs;
+	/** File name of the mounted file.
+	**/
+	boost::filesystem::path tmp(m_name.leaf());
 
-	return 0;
+	/** Allow to open only once the mounted file.
+	**/
+	if (tmp.string().compare(&name[1]) == 0)
+	{
+		if (m_refs)
+			return -EACCES;
+		++m_refs;
+		return 0;
+	}
+	/** Allow to open '.stat' file.
+	**/
+	else if (strcmp(&name[1], ".stat") == 0)
+		return 0;
+
+	return -ENOENT;
 }
 
 int PreLoadFs::release(const char *name, struct fuse_file_info * /*fi*/)
 {
-	if (--m_refs == 0)
+	/** File name of the mounted file.
+	**/
+	boost::filesystem::path tmp(m_name.leaf());
+
+	/** Allow to open only our mounted file or '.stat'.
+	**/
+	if (tmp.string().compare(&name[1]) == 0)
 	{
+		--m_refs;
+
 		/** Set flags to default state.
 		**/
 		m_exception = false;
 		m_seeked = false;
 	}
+
 	return 0;
 }
 
@@ -191,8 +220,18 @@ void PreLoadFs::seek(off_t offset)
 	pthread_cond_signal(&m_wakeupReadNewData);
 }
 
+int PreLoadFs::stat(char *buf, size_t len)
+{
+	/** Ignore locking, this is only for statistical purpose.
+	**/
+	return snprintf(buf, len, "FREE: %d, FULL: %d\n", m_buffer.free(), m_buffer.full());
+}
+
 int PreLoadFs::read(const char *name, char *buf, size_t len, off_t offset, struct fuse_file_info * /*fi*/)
 {
+	if (strcmp(&name[1], ".stat") == 0)
+		return stat(buf, len);
+
 	char *orig_buf = buf;
 
 	if (g_DebugMode)
@@ -216,9 +255,6 @@ int PreLoadFs::read(const char *name, char *buf, size_t len, off_t offset, struc
 
 	while (len > 0)
 	{
-		if (g_DebugMode)
-			m_buffer.stats();
-
 		while (m_buffer.isFree() && (m_exception == false))
 		{
 			/** Wait for a new data if buffer is empty or exception
@@ -298,7 +334,7 @@ void *PreLoadFs::runT(void *arg)
 void PreLoadFs::run()
 {
 	off_t offset = 0;
-	int   buf_size = std::min(64 * 1024, m_buffer.size());
+	int   buf_size = std::min(128 * 1024, m_buffer.size());
 	char* buf = new char[buf_size];
 
 	/** We are read only buffering 'filesystem'. So we open
@@ -322,9 +358,6 @@ void PreLoadFs::run()
 
 	while (true)
 	{
-		if (g_DebugMode)
-			m_buffer.stats();
-
 		/** Wait until buffer is not full or exception is resolved.
 		**/
 		while (m_buffer.isFull() || (m_exception == true))

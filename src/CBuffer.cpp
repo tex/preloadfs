@@ -13,11 +13,6 @@ CBuffer::CBuffer(int bufferSize) :
 {
 }
 
-void CBuffer::stats()
-{
-	std::cout << "FULL (KiB): " << full() / 1024 << " | FREE (KiB): " << free() / 1024 << std::endl;
-}
-
 void CBuffer::clear()
 {
 	m_readP = 0;
