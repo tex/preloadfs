@@ -1,0 +1,44 @@
+PreloadFs (preloading read-only filesystem)
+	http://www.miio.net/preloadfs
+
+I'am not responsible for any badness that may happen to you during using
+this software.
+
+License:
+
+This program is distributed under GNU/GPL version 2. 
+
+Todo:
+
+Bugs:
+
+Problems:
+
+Requires:
+
+	fuse >= 2.5
+	boost >= 1.35.0 (Boost.Asio)
+
+Compile:
+
+	Boost's libraries may be stored in /usr/lib64 on 64bit systems,
+	configure script needs to be called with:
+
+	./configure --with-boost-libdir=/usr/lib64/
+
+	Don't use --enable-debug flag. Build fails during linking with boost
+	libraries.
+
+Usage:
+
+	preloadfs source_file mount_point temporary_directory buffer_size
+
+	Source file may be a local file or a http link.
+	Buffer size is in KiB.
+
+Author:
+
+Milan Svoboda <milan.svoboda@centrum.cz> (author and project maintainer)
+
+Feel free to contact me with suggestions and bug reports.
+
