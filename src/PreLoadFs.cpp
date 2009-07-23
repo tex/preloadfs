@@ -1,6 +1,7 @@
 #include "PreLoadFs.hpp"
 #include "Device.hpp"
 #include "DeviceFile.hpp"
+#include "DeviceHttp.hpp"
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
@@ -355,10 +356,10 @@ void *PreLoadFs::runT(void *arg)
 void PreLoadFs::run()
 {
 	off_t offset = 0;
-	int   buf_size = std::min(128 * 1024, m_buffer.size());
+	int   buf_size = std::min(64 * 1024, m_buffer.size());
 	char* buf = new char[buf_size];
 
-	Device *dev = new DeviceFile();
+	Device *dev = new DeviceHttp(); // File();
 
 	/** We are read only buffering 'filesystem'. So we open
 	 *  a file as read only. And we do not care about closing

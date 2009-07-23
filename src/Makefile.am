@@ -5,7 +5,8 @@ common = \
 	CBuffer.cpp \
 	FBuffer.cpp \
 	MBuffer.cpp \
-	DeviceFile.cpp
+	DeviceFile.cpp \
+	DeviceHttp.cpp
 
 noinst_HEADERS = \
 	PreLoadFs.hpp \
@@ -13,7 +14,8 @@ noinst_HEADERS = \
 	FBuffer.hpp \
 	MBuffer.hpp \
 	Device.hpp \
-	DeviceFile.hpp
+	DeviceFile.hpp \
+	DeviceHttp.hpp
 
 preloadfs_SOURCES = $(common) main.cpp
 preloadfs_LDADD = $(BOOST_SYSTEM_LIB) $(FUSE_LIBS)
