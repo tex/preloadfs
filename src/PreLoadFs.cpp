@@ -356,6 +356,7 @@ void *PreLoadFs::runT(void *arg)
 void PreLoadFs::run()
 {
 	off_t offset = 0;
+	off_t size = 0;
 	int   buf_size = std::min(64 * 1024, m_buffer.size());
 	char* buf = new char[buf_size];
 
@@ -367,14 +368,16 @@ void PreLoadFs::run()
 	 *  whole application is going to end.
 	**/
 	bool b = dev->open(m_name.string().c_str());
-
-	/** Get size of the file
-	**/
-	off_t size = dev->size();
+	if (true == b)
+	{
+		/** Get size of the file
+		**/
+		size = dev->size();
+	}
 
 	pthread_mutex_lock(&m_mutex);
 
-	if (b == false)
+	if (false == b)
 	{
 		m_exception = true;
 		m_error = errno;
@@ -385,6 +388,9 @@ void PreLoadFs::run()
 	}
 
 	m_size = size;
+
+	/** Signal that the size of the file is available.
+	**/
 	pthread_cond_signal(&m_wakeupStatAvailable);
 
 	while (true)
