@@ -5,6 +5,7 @@ common = \
 	CBuffer.cpp \
 	FBuffer.cpp \
 	MBuffer.cpp \
+	Device.cpp \
 	DeviceFile.cpp \
 	DeviceHttp.cpp
 

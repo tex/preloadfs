@@ -9,6 +9,8 @@ public:
 	bool open(const char *name);
 	ssize_t pread(char *buf, size_t len, off_t offset);
 	off_t size();
+	void cancel() { };
+
 private:
 	int m_fd;
 };
