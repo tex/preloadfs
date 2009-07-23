@@ -360,7 +360,7 @@ void PreLoadFs::run()
 	int   buf_size = std::min(64 * 1024, m_buffer.size());
 	char* buf = new char[buf_size];
 
-	Device *dev = new DeviceHttp(); // File();
+	Device *dev = Device::deviceFactory(m_name.string().c_str());
 
 	/** We are read only buffering 'filesystem'. So we open
 	 *  a file as read only. And we do not care about closing
