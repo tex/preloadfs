@@ -475,13 +475,12 @@ void PreLoadFs::run()
 				 *  (most probably problem with backing file).
 				**/
 				m_exception = true;
-				m_error = errno;
-
-				/** Exit the application.
-				**/
-				exit(EXIT_FAILURE);
+				m_error = EIO;
 			}
-			assert(t == r);
+			else
+			{
+				assert(t == r);
+			}
 		}
 		/** Signal that there are new data available (or error).
 		**/
