@@ -1,6 +1,7 @@
 #include "DeviceFile.hpp"
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <string.h>
 #include <fcntl.h>
 #include <unistd.h>
 
@@ -20,6 +21,7 @@ ssize_t DeviceFile::pread(char *buf, size_t len, off_t offset)
 off_t DeviceFile::size()
 {
 	struct stat st;
+	memset(&st, 0, sizeof(st));
 	fstat(m_fd, &st);
 	return st.st_size;
 }
