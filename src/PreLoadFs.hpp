@@ -1,5 +1,5 @@
-#ifndef CACHEFS_HPP
-#define CACHEFS_HPP
+#ifndef PRELOADFS_HPP
+#define PRELOADFS_HPP
 
 #include "MBuffer.hpp"
 #include <fuse.h>
