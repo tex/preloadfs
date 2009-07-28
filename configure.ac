@@ -25,6 +25,7 @@ LDFLAGS="$LDFLAGS $PTHREAD_LIBS $USER_LDFLAGS"
 
 AX_BOOST_BASE([1.33.1])
 AX_BOOST_SYSTEM
+AX_BOOST_PROGRAM_OPTIONS
 
 # Checks for libraries.
 AC_CHECK_LIB([pthread], [pthread_mutex_lock],,

@@ -10,7 +10,7 @@
 class MBuffer : public CBuffer
 {
 public:
-	MBuffer(std::string, int bufferSize);
+	MBuffer(const std::string& tmpPath, int bufferSize);
 	~MBuffer();
 
 private:

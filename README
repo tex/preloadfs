@@ -17,7 +17,7 @@ Problems:
 Requires:
 
 	fuse >= 2.5
-	boost >= 1.35.0 (Boost.Asio)
+	boost >= 1.35.0 (Boost.Asio required)
 
 Compile:
 
@@ -31,10 +31,16 @@ Compile:
 
 Usage:
 
-	preloadfs source_file mount_point temporary_directory buffer_size
+	preloadfs [options] fileToMount mountPath
 
-	Source file may be a local file or a http link.
-	Buffer size is in KiB.
+	Options:
+	  --fileToMount arg     file to mount (local file or HTTP URL)
+	  --mountPoint arg      mount point
+	  -t [ --tmp ] arg      temporary path for a buffer
+	  -b [ --buffer ] arg   buffer size in KiB
+	  -d [ --debug ]        turn on debug mode
+	  -h [ --help ]         print this help
+	  -v [ --version ]      print version
 
 Author:
 

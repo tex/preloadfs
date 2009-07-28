@@ -10,7 +10,7 @@
 class FBuffer : public CBuffer
 {
 public:
-	FBuffer(std::string path, int bufferSize);
+	FBuffer(const std::string& tmpPath, int bufferSize);
 	~FBuffer();
 
 private:

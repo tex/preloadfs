@@ -1,6 +1,7 @@
 #include "config.h"
 
 #include "PreLoadFs.hpp"
+#include "config.h"
 
 #include <errno.h>
 #include <sys/types.h>
@@ -16,21 +17,19 @@
 #include <vector>
 #include <string>
 
-bool       g_DebugMode;
+#include <boost/program_options.hpp>
+
+namespace po = boost::program_options;
+
+bool       g_DebugMode = false;
 PreLoadFs* g_PreLoadFs;
 
 void print_license()
 {
 	printf("%s version %s\n", PACKAGE_NAME, PACKAGE_VERSION);
-	printf("Copyright (C) 2008  Milan Svoboda.\n");
+	printf("Copyright (C) 2008,2009  Milan Svoboda.\n");
 	printf("This is free software; see the source for copying conditions.  There is NO\n");
 	printf("warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n");
-}
-
-void print_help(const char *name)
-{
-	printf("%s fileToMount mountPoint tmpPath bufSize(in KiB)\n", name);
-	exit(EXIT_FAILURE);
 }
 
 void *Init()
@@ -68,7 +67,7 @@ int Read(const char *name, char *buf, size_t len, off_t offset, struct fuse_file
 	return g_PreLoadFs->read(name, buf, len, offset, fi);
 }
 
-int run(std::vector<const char *>& fuse_c_str, const char* fileToMount, const char* tmpPath, int bufSize)
+int run(std::vector<const char *>& fuse_c_str, const std::string& fileToMount, const std::string& tmpPath, int bufSize)
 {
 	g_PreLoadFs = new PreLoadFs(tmpPath, bufSize, fileToMount);
 	if (g_PreLoadFs == NULL)
@@ -95,15 +94,59 @@ int main(int argc, char **argv)
 {
 	std::vector<const char *> fuse_c_str;
 
-	g_DebugMode = false;
+	std::string fileToMount;
+	std::string mountPoint;
+	std::string tmpPath = "/tmp";
+	int bufSize = 128;
 
-	if (argc != 5)
-		print_help(argv[0]);
+	po::options_description desc("Usage: " PACKAGE " [options] fileToMount mountPath\n" "\nOptions");
+	desc.add_options()
+		("fileToMount", po::value<std::string>(&fileToMount), "file to mount (local file or HTTP URL)")
+		("mountPoint", po::value<std::string>(&mountPoint), "mount point")
+		("tmp,t", po::value<std::string>(&tmpPath), "temporary path for a buffer")
+		("buffer,b", po::value<int>(&bufSize), "buffer size in KiB")
+		("debug,d", "turn on debug mode")
+		("help,h", "print this help")
+		("version,v", "print version")
+	;
 
-	const char* fileToMount = argv[1];
-	const char* mountPoint = argv[2];
-	const char* tmpPath = argv[3];
-	int bufSize = atoi(argv[4]) * 1024;
+	po::positional_options_description pdesc;
+	pdesc.add("fileToMount", 1);
+	pdesc.add("mountPoint", 1);
+
+	po::variables_map vm;
+	try {
+		po::store(po::command_line_parser(argc, argv).options(desc).positional(pdesc).run(), vm);
+	} catch (...) {
+		std::cout << desc;;
+		exit(EXIT_FAILURE);
+	}
+	po::notify(vm);
+
+	if (vm.count("help"))
+	{
+		std::cout << desc;
+		exit(EXIT_SUCCESS);
+	}
+	if (vm.count("version"))
+	{
+		print_license();
+		exit(EXIT_SUCCESS);
+	}
+	if (vm.count("debug"))
+	{
+		g_DebugMode = true;
+	}
+	if (fileToMount.empty())
+	{
+		std::cout << "fileToMount not set!\n" << desc;
+		exit(EXIT_FAILURE);
+	}
+	if (mountPoint.empty())
+	{
+		std::cout << "mountPoint not set!\n" << desc;
+		exit(EXIT_FAILURE);
+	}
 
 	fuse_c_str.push_back(argv[0]);
 
@@ -111,10 +154,10 @@ int main(int argc, char **argv)
 		fuse_c_str.push_back("-f");
 	fuse_c_str.push_back("-o");
 	fuse_c_str.push_back("default_permissions,use_ino");
-	fuse_c_str.push_back(mountPoint);
+	fuse_c_str.push_back(mountPoint.c_str());
 
-	chdir(mountPoint);
+	chdir(mountPoint.c_str());
 
-	return run(fuse_c_str, fileToMount, tmpPath, bufSize);
+	return run(fuse_c_str, fileToMount, tmpPath, bufSize * 1024);
 }
 

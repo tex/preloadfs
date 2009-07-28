@@ -12,7 +12,7 @@ public:
 	/** Constructor.
 	 *  @param tmpPath temporary file storage path
 	 **/
-	PreLoadFs(std::string tmpPath, size_t tmpSize, std::string fileToMount);
+	PreLoadFs(const std::string& tmpPath, size_t tmpSize, const std::string& fileToMount);
 	~PreLoadFs();
 
 	void *init();

@@ -1,7 +1,7 @@
 #include "MBuffer.hpp"
 #include <string.h>
 
-MBuffer::MBuffer(std::string, int bufferSize) :
+MBuffer::MBuffer(const std::string&, int bufferSize) :
 	CBuffer(bufferSize)
 {
 	m_buffer = new char[bufferSize];

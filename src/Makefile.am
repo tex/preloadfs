@@ -19,7 +19,7 @@ noinst_HEADERS = \
 	DeviceHttp.hpp
 
 preloadfs_SOURCES = $(common) main.cpp
-preloadfs_LDADD = $(BOOST_SYSTEM_LIB) $(FUSE_LIBS)
+preloadfs_LDADD = $(BOOST_SYSTEM_LIB) $(BOOST_PROGRAM_OPTIONS_LIB) $(FUSE_LIBS)
 
 AM_CXXFLAGS = $(BOOST_CXXFLAGS)
 

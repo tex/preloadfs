@@ -5,13 +5,13 @@
 #include <vector>
 #include <iostream>
 
-FBuffer::FBuffer(std::string path, int bufferSize) :
+FBuffer::FBuffer(const std::string& tmpPath, int bufferSize) :
 	CBuffer(bufferSize)
 {
 	std::string name = "/XXXXXX";
 	std::vector<char> fullPath;
 
-	fullPath.assign(path.begin(), path.end());
+	fullPath.assign(tmpPath.begin(), tmpPath.end());
 	fullPath.insert(fullPath.end(), name.begin(), name.end());
 
 	m_fd = ::mkstemp(&fullPath[0]);

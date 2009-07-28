@@ -11,7 +11,7 @@
 
 extern bool g_DebugMode;
 
-PreLoadFs::PreLoadFs(std::string tmpPath, size_t tmpSize, std::string fileToMount) :
+PreLoadFs::PreLoadFs(const std::string& tmpPath, size_t tmpSize, const std::string& fileToMount) :
 	m_name(fileToMount),
 	m_refs(0),
 	m_offset(0),
