@@ -41,20 +41,22 @@ ssize_t DeviceHttp::pread(char *destination, size_t size, off_t start)
 	m_data = destination;
 	m_size = size;
 
-	std::ostream request_stream(&m_request);
-	request_stream << "GET " << m_path << " HTTP/1.1\r\n";
-	request_stream << "User-Agent: Wget/1.11.1\r\n";
-	request_stream << "Host: " << m_server << "\r\n";
-	request_stream << "Range: bytes=" << start << "-" << end << "\r\n\r\n";
+	do {
+		m_error = false;
 
-	assert(m_request.size () == 0);
+		std::ostream request_stream(&m_request);
+		request_stream << "GET " << m_path << " HTTP/1.1\r\n";
+		request_stream << "Host: " << m_server << "\r\n";
+		request_stream << "Range: bytes=" << start << "-" << end << "\r\n\r\n";
 
-	// Reuse old connected socket.
-	boost::system::error_code err;
-	handleGetSizeConnect(err, boost::asio::ip::tcp::resolver::iterator());
+		// Reuse old connected socket.
+		boost::system::error_code err;
+		handleGetSizeConnect(err, boost::asio::ip::tcp::resolver::iterator());
 
-	m_ioservice.reset();
-	m_ioservice.run();
+		m_ioservice.reset();
+		m_ioservice.run();
+	}
+	while (m_error == true);
 
 	return size - m_size;
 }
@@ -71,7 +73,6 @@ void DeviceHttp::resolve()
 {
 	std::ostream request_stream(&m_request);
 	request_stream << "HEAD " << m_path << " HTTP/1.1\r\n";
-	request_stream << "User-Agent: Wget/1.11.1\r\n";
 	request_stream << "Host: " << m_server << "\r\n\r\n";
 
 	// Start an asynchronous resolve to translate the server and
@@ -92,6 +93,7 @@ void DeviceHttp::handleGetSizeResolve(const boost::system::error_code& err,
 		// Attempt a connection to the first endpoint in the list. Each endpoint
 		// will be tried until we successfully establish a connection.
 		boost::asio::ip::tcp::endpoint endpoint = *endpoint_iterator;
+		m_socket.close();
 		m_socket.async_connect(endpoint,
 		                       boost::bind(&DeviceHttp::handleGetSizeConnect,
 		                                   this,
@@ -100,7 +102,7 @@ void DeviceHttp::handleGetSizeResolve(const boost::system::error_code& err,
 	}
 	else
 	{
-		std::cout << "Error: " << err.message() << "\n";
+		std::cout << "Error: " << err.message() << " / " << __PRETTY_FUNCTION__ << "\n";
 	}
 }
 
@@ -129,7 +131,7 @@ void DeviceHttp::handleGetSizeConnect(const boost::system::error_code& err,
 	}
 	else
 	{
-		std::cout << "Error: " << err.message() << "\n";
+		std::cout << "Error: " << err.message() << " / " << __PRETTY_FUNCTION__ << "\n";
 	}
 }
 
@@ -147,7 +149,7 @@ void DeviceHttp::handleGetSizeWriteRequest(const boost::system::error_code& err)
 	}
 	else
 	{
-		std::cout << "Error: " << err.message() << "\n";
+		std::cout << "Error: " << err.message() << " / " << __PRETTY_FUNCTION__ << "\n";
 	}
 }
 
@@ -201,18 +203,25 @@ void DeviceHttp::handleGetSizeReadHeaders(const boost::system::error_code& err)
 		else if ((status_code >= 300) && (status_code < 400) && !location.empty())
 		{
 			// Redirection required.
-			m_socket.close();
+			// Create an absolute path if relative is given.
+			if (strncasecmp(location.c_str(), "http://", 7) != 0)
+				location = "http://" + m_server + location;
 			parseUrl(location);
 			resolve();
 		}
 		else
 		{
 			std::cout << "Response returned with status code " << status_code << "\n";
+			errno = ENOENT;
 		}
 	}
 	else
 	{
-		std::cout << "Error: " << err.message() << "\n";
+		std::cout << "Error: " << err.message() << " / " << __PRETTY_FUNCTION__ << " / Performing reconect...\n";
+
+		// Set flag to let pread() know that it must restart a request.
+		m_error = true;
+		resolve();
 	}
 }
 
@@ -240,7 +249,7 @@ void DeviceHttp::handleReadContent(const boost::system::error_code& err)
 	}
 	else
 	{
-		std::cout << "Error: " << err.message() << "\n";
+		std::cout << "Error: " << err.message() << " / " << __PRETTY_FUNCTION__ << "\n";
 	}
 }
 

@@ -36,6 +36,11 @@ private:
         off_t  m_contentLength;
         char  *m_data;
         size_t m_size;
+
+	// If true, connection has been closed by server. The connection
+	// must be restarted in that case.
+	//
+	bool   m_error;
 };
 
 #endif
