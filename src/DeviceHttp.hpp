@@ -16,10 +16,10 @@ public:
 
 private:
 	void resolve();
-	void handleGetSizeReadHeaders(const boost::system::error_code& err);
-	void handleGetSizeWriteRequest(const boost::system::error_code& err);
-	void handleGetSizeConnect(const boost::system::error_code& err, boost::asio::ip::tcp::resolver::iterator endpoint_iterator);
-	void handleGetSizeResolve(const boost::system::error_code& err, boost::asio::ip::tcp::resolver::iterator endpoint_iterator);
+	void handleReadHeaders(const boost::system::error_code& err);
+	void handleWriteRequest(const boost::system::error_code& err);
+	void handleConnect(const boost::system::error_code& err, boost::asio::ip::tcp::resolver::iterator endpoint_iterator);
+	void handleResolve(const boost::system::error_code& err, boost::asio::ip::tcp::resolver::iterator endpoint_iterator);
 	void handleReadContent(const boost::system::error_code& err);
 	void parseUrl(const std::string url);
 
@@ -37,10 +37,13 @@ private:
         char  *m_data;
         size_t m_size;
 
-	// If true, connection has been closed by server. The connection
-	// must be restarted in that case.
+	// If true, error has been detected.
 	//
-	bool   m_error;
+	bool m_error;
+
+	// If true, server supports only closed connection.
+	//
+	bool m_closed;
 };
 
 #endif

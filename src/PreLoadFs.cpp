@@ -89,7 +89,7 @@ int PreLoadFs::getattr(const char *name, struct stat *st)
 		if (tmp.string().compare(name) == 0)
 		{
 			pthread_mutex_lock(&m_mutex);
-			while (m_size == 0)
+			while ((m_size == 0) && (m_exception == false))
 			{
 				pthread_cond_wait(&m_wakeupStatAvailable, &m_mutex);
 			}
@@ -181,11 +181,13 @@ int PreLoadFs::release(const char *name, struct fuse_file_info * /*fi*/)
 	if (tmp.string().compare(&name[1]) == 0)
 	{
 		--m_refs;
-
+std::cout << "m_exception: " << m_exception << ", m_error: " << m_error << "\n";
 		/** Set flags to default state.
 		**/
-		m_exception = false;
+		if ((m_exception == true) && (m_error == 0))
+			m_exception = false;
 		m_seeked = false;
+std::cout << "m_exception: " << m_exception << ", m_error: " << m_error << "\n";
 	}
 
 	return 0;
@@ -199,14 +201,10 @@ void PreLoadFs::seek(off_t offset)
 	assert(m_offset != offset);
 
 	if (g_DebugMode)
-		std::cout << __PRETTY_FUNCTION__ << " " << offset << std::endl;
+		std::cout << __PRETTY_FUNCTION__ << std::hex << offset << std::dec << std::endl;
 
 	if ((m_offset < offset) && (m_offset + m_buffer.full() > offset))
 	{
-		if (g_DebugMode)
-			std::cout << __PRETTY_FUNCTION__ << " fast m_offset:" << m_offset
-			          << ", offset:" << offset << ", ->" << m_offset + m_buffer.full() << std::endl;
-
 		/** There are data in the buffer covering required offset.
 		**/
 		assert(offset - m_offset > 0);
@@ -254,10 +252,6 @@ int PreLoadFs::read(const char *name, char *buf, size_t len, off_t offset, struc
 
 	char *orig_buf = buf;
 
-	if (g_DebugMode)
-		std::cout << __PRETTY_FUNCTION__<< "offset: " << offset
-		          << ", len: " << len << ", m_offset: " << m_offset << std::endl;
-
 	/** File name of the mounted file.
 	**/
 	boost::filesystem::path tmp(m_name.leaf());
@@ -277,6 +271,10 @@ int PreLoadFs::read(const char *name, char *buf, size_t len, off_t offset, struc
 	{
 		while (m_buffer.isFree() && (m_exception == false))
 		{
+			/** Let know the thread that it can read new data.
+			**/
+			pthread_cond_signal(&m_wakeupReadNewData);
+
 			/** Wait for a new data if buffer is empty or exception
 			 *  is detected (when exception is detected there will be no more
 			 *  data so we have to read what's available because there will
@@ -323,7 +321,6 @@ int PreLoadFs::read(const char *name, char *buf, size_t len, off_t offset, struc
 				break;
 			}
 		}
-
 		/** Let know the thread that it can read new data.
 		**/
 		pthread_cond_signal(&m_wakeupReadNewData);
