@@ -65,6 +65,11 @@ int Read(const char *name, char *buf, size_t len, off_t offset, struct fuse_file
 	return g_PreLoadFs->read(name, buf, len, offset, fi);
 }
 
+int Write(const char *name, const char *buf, size_t len, off_t offset, struct fuse_file_info *fi)
+{
+	return g_PreLoadFs->write(name, buf, len, offset, fi);
+}
+
 int run(std::vector<const char *>& fuse_c_str, const std::string& fileToMount, const std::string& tmpPath, int bufSize)
 {
 	g_PreLoadFs = new PreLoadFs(tmpPath, bufSize, fileToMount);
@@ -83,6 +88,7 @@ int run(std::vector<const char *>& fuse_c_str, const std::string& fileToMount, c
 	ops.readdir = Readdir;
 	ops.open = Open;
 	ops.read = Read;
+	ops.write = Write;
 	ops.release = Release;
  
 	return fuse_main(fuse_c_str.size(), const_cast<char**>(&fuse_c_str[0]), &ops);

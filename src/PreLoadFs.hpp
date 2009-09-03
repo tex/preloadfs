@@ -24,6 +24,7 @@ public:
 	int open(const char *name, struct fuse_file_info *fi);
 	int release(const char *name, struct fuse_file_info *fi);
 	int read(const char *name, char *buf, size_t len, off_t offset, struct fuse_file_info *fi);
+	int write(const char *name, const char *buf, size_t len, off_t offset, struct fuse_file_info *fi);
 
 private:
 	int stat(char *buf, size_t len);

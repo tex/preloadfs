@@ -99,6 +99,7 @@ int PreLoadFs::getattr(const char *name, struct stat *st)
 		}
 		else if (strcmp(name, ".stat") == 0)
 		{
+			st->st_mode |= S_IWUSR | S_IWGRP | S_IWOTH;
 			st->st_size = 1024;
 			st->st_ino = 3;
 		}
@@ -144,11 +145,6 @@ int PreLoadFs::open(const char *name, struct fuse_file_info *fi)
 	if (g_DebugMode)
 		std::cout << __PRETTY_FUNCTION__ << std::endl;
 
-	/** Allow to open only in read only mode.
-	**/
-	if ((fi->flags & 3) != O_RDONLY)
-		return -EACCES;
-
 	/** File name of the mounted file.
 	**/
 	boost::filesystem::path tmp(m_name.leaf());
@@ -157,6 +153,11 @@ int PreLoadFs::open(const char *name, struct fuse_file_info *fi)
 	**/
 	if (tmp.string().compare(&name[1]) == 0)
 	{
+		/** Allow to open only in read only mode.
+		**/
+		if ((fi->flags & 3) != O_RDONLY)
+			return -EACCES;
+
 		if (m_refs)
 			return -EACCES;
 		++m_refs;
@@ -226,7 +227,8 @@ void PreLoadFs::seek(off_t offset)
 		/** Clear exception flag. It might be set when end of
 		 *  file detected, so seek should clear this exception.
 		**/
-		m_exception = false;
+		if ((m_exception == true) && (m_error == 0))
+			m_exception = false;
 	}
 
 	/** Set offset to new value.
@@ -243,6 +245,20 @@ int PreLoadFs::stat(char *buf, size_t len)
 	/** Ignore locking, this is only for statistical purpose.
 	**/
 	return snprintf(buf, len, "FREE: %d, FULL: %d\n", m_buffer.free(), m_buffer.full());
+}
+
+int PreLoadFs::write(const char *name, const char *buf, size_t len, off_t offset, struct fuse_file_info * /*fi*/)
+{
+	if (strcmp(&name[1], ".stat") == 0)
+	{
+		// This unblock conditional loop in read()...
+		m_exception = true;
+		m_error = EINTR;
+		pthread_cond_signal(&m_wakeupReadNewData);
+
+		return len;
+	}
+	return -ENOENT;
 }
 
 int PreLoadFs::read(const char *name, char *buf, size_t len, off_t offset, struct fuse_file_info * /*fi*/)
